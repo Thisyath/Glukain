@@ -1,8 +1,25 @@
-# Glukain - AI Pemantau Mandiri Pasien Diabetes
+# Glukain — AI Pemantau Mandiri Pasien Diabetes
 
-Aplikasi web pendamping untuk pasien diabetes yang sudah didiagnosis dokter. Pasien mengunggah foto/PDF hasil pemeriksaan, sistem membaca nilai medis lewat OCR, menentukan fase kondisi (rule-based), lalu menyusun rekomendasi diet, aktivitas, dan jadwal obat.
+## Latar Belakang
 
-**Disclaimer:** Glukain bukan pengganti saran dokter.
+Pasien diabetes yang sudah didiagnosis dokter umumnya menjalani pemeriksaan berkala (HbA1c, gula darah, profil lipid, tekanan darah). Hasilnya sering hanya diterima sebagai **foto atau PDF lembar laboratorium** berisi deretan angka, tanpa penjelasan apakah kondisi sedang membaik, memburuk, atau perlu perhatian lebih lanjut. Akibatnya pasien sulit menjawab tiga pertanyaan sederhana: *seberapa baik kondisiku sekarang, apa yang berubah sejak pemeriksaan terakhir, dan apa yang harus kulakukan berikutnya.*
+
+**Glukain** adalah aplikasi web pendamping yang dirancang untuk menjembatani kesenjangan itu. Alurnya:
+
+1. Pasien **mengunggah** foto atau PDF hasil pemeriksaan lab.
+2. Sistem **membaca nilai medis** dari dokumen tersebut (OCR).
+3. Pasien **memeriksa dan mengoreksi** hasil bacaan sebelum disimpan, agar data yang masuk tetap berada di bawah kendalinya.
+4. Sistem **menentukan fase kondisi** (TerKontrol / Perlu Perhatian / Berisiko Tinggi / Belum Dapat Ditentukan) memakai aturan berbasis ambang batas.
+5. Sistem **menyusun rekomendasi** diet, aktivitas, dan catatan obat sesuai fase tersebut, lalu menampilkannya di dasbor.
+
+Tujuan Glukain adalah membantu pasien memahami tren kondisinya sendiri dan mendorong kepatuhan pada anjuran dokter — bukan menggantikan peran tenaga medis.
+
+### Batasan
+
+- **Glukain bukan pengganti saran dokter** dan bukan alat diagnosis. Sistem tidak menegakkan diagnosis dan tidak meresepkan obat.
+- Fase kondisi ditentukan oleh **aturan berbasis ambang batas (rule-based)**, bukan model prediktif. Sistem ini juga tidak memprediksi risiko diabetes.
+- Ambang batas yang dipakai adalah usulan awal dan masih perlu divalidasi dengan sumber medis.
+- Saat ini pembacaan dokumen (OCR) berjalan dalam **mode mock** dengan hasil contoh yang tetap, sampai API AI tersedia.
 
 ---
 
@@ -10,141 +27,105 @@ Aplikasi web pendamping untuk pasien diabetes yang sudah didiagnosis dokter. Pas
 
 | Lapisan | Teknologi |
 |---|---|
-| Frontend | React + TypeScript + Vite + Tailwind CSS |
-| Backend | Node.js + Express + TypeScript |
-| Database | MySQL 8 + Prisma ORM |
-| Auth | JWT + Argon2id + Refresh Token Rotation |
-| AI | API AI free tier (Gemini) - siap diganti |
+| Frontend | React 18, TypeScript, Vite 5, Tailwind CSS 3 |
+| Routing & data | React Router 6, TanStack Query, Axios |
+| Form & validasi | React Hook Form, Zod |
+| Grafik | Recharts |
+| Backend | Node.js, Express 4, TypeScript, `tsx` |
+| Database | MySQL 8, Prisma ORM 5 |
+| Autentikasi | JWT, Argon2id |
+| Keamanan | Helmet, CORS, express-rate-limit |
+| Email | Nodemailer |
+| OCR / AI | Gemini API (rencana) |
+| Unggahan berkas | Multer |
 
 ---
 
-## Progress 30% (8 Use Case Esensial)
-
-| # | Use Case | Status | Layar |
-|---|---|---|---|
-| 1 | UC-01: Register | Selesai | S-02 |
-| 2 | UC-18: Verify Email | Selesai | S-03 |
-| 3 | UC-02: Login | Selesai | S-04 |
-| 4 | UC-19: Forgot Password | Selesai | S-05 |
-| 5 | UC-04: Upload Document | Selesai | S-07 |
-| 6 | UC-05: Extract Medical Data | Selesai | S-08 |
-| 7 | UC-20: Confirm Extraction | Selesai | S-09 |
-| 8 | UC-06: Classify Phase | Selesai | S-09 |
-| 9 | UC-08: Dashboard | Selesai | S-06 |
-
----
-
-## Struktur Proyek
+## Struktur Folder
 
 ```
-glukain/
+Glukain/
 ├── backend/
 │   ├── prisma/
+│   │   ├── migrations/
 │   │   ├── schema.prisma
 │   │   └── seed.ts
 │   ├── src/
-│   │   ├── config/        (env.ts, thresholds.ts)
-│   │   ├── routes/        (auth, documents, dashboard)
-│   │   ├── services/      (auth, extraction, classification, dashboard)
-│   │   ├── middlewares/   (authJwt, rateLimit, validate)
-│   │   ├── utils/         (jwt, time)
+│   │   ├── config/
+│   │   │   ├── env.ts
+│   │   │   └── thresholds.ts
+│   │   ├── lib/
+│   │   │   └── prisma.ts
+│   │   ├── middlewares/
+│   │   │   ├── authJwt.ts
+│   │   │   ├── rateLimit.ts
+│   │   │   └── validate.ts
+│   │   ├── routes/
+│   │   │   ├── auth.routes.ts
+│   │   │   ├── dashboard.routes.ts
+│   │   │   └── documents.routes.ts
+│   │   ├── services/
+│   │   │   ├── auth.service.ts
+│   │   │   ├── classification.service.ts
+│   │   │   ├── dashboard.service.ts
+│   │   │   └── extraction.service.ts
+│   │   ├── utils/
+│   │   │   ├── jwt.ts
+│   │   │   └── time.ts
 │   │   ├── app.ts
 │   │   └── server.ts
 │   ├── uploads/
-│   └── tests/
+│   ├── .env.example
+│   └── package.json
 ├── frontend/
-│   └── src/
-│       ├── pages/         (9 halaman)
-│       ├── components/    (Layout, Header, BottomNav)
-│       ├── api/           (client, auth, documents, dashboard)
-│       └── styles/
-└── docs/
-    ├── PRD_Glukain_All.md
-    └── PRD_Glukain_Figma.md
+│   ├── src/
+│   │   ├── api/
+│   │   │   ├── auth.ts
+│   │   │   ├── client.ts
+│   │   │   ├── dashboard.ts
+│   │   │   └── documents.ts
+│   │   ├── components/
+│   │   │   ├── assets/
+│   │   │   │   └── BrandMark.tsx
+│   │   │   ├── auth/
+│   │   │   │   ├── AuthLayout.tsx
+│   │   │   │   ├── BrandStory.tsx
+│   │   │   │   ├── FormHeading.tsx
+│   │   │   │   ├── Notice.tsx
+│   │   │   │   └── TextField.tsx
+│   │   │   ├── BottomNav.tsx
+│   │   │   ├── Button.tsx
+│   │   │   ├── InfoAlert.tsx
+│   │   │   ├── Layout.tsx
+│   │   │   ├── MedicalDisclaimer.tsx
+│   │   │   ├── NavigationSidebar.tsx
+│   │   │   ├── PageHeading.tsx
+│   │   │   ├── WebHeader.tsx
+│   │   │   └── icons.tsx
+│   │   ├── lib/
+│   │   │   └── format.ts
+│   │   ├── pages/
+│   │   │   ├── ComingSoonPage.tsx
+│   │   │   ├── ConfirmExtractionPage.tsx
+│   │   │   ├── DashboardPage.tsx
+│   │   │   ├── ForgotPasswordPage.tsx
+│   │   │   ├── LandingPage.tsx
+│   │   │   ├── LoginPage.tsx
+│   │   │   ├── ProcessingPage.tsx
+│   │   │   ├── RegisterPage.tsx
+│   │   │   ├── ResetPasswordPage.tsx
+│   │   │   ├── UploadDocumentPage.tsx
+│   │   │   └── VerifyEmailPage.tsx
+│   │   ├── styles/
+│   │   │   └── index.css
+│   │   ├── App.tsx
+│   │   ├── design-tokens.tokens.json
+│   │   ├── main.tsx
+│   │   └── navigation.ts
+│   ├── index.html
+│   ├── tailwind.config.js
+│   ├── vite.config.ts
+│   └── package.json
+├── .gitignore
+└── README.md
 ```
-
----
-
-## Cara Menjalankan
-
-### 1. Setup Database
-Pastikan MySQL 8 sudah berjalan, lalu buat database:
-```sql
-CREATE DATABASE glukain;
-```
-
-### 2. Backend
-```bash
-cd backend
-cp .env.example .env
-# Edit .env dengan kredensial MySQL dan API key AI
-npm install
-npx prisma migrate dev
-npx prisma db seed
-npm run dev
-```
-
-### 3. Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### 4. Akses
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3001/api/v1
-
----
-
-## API Endpoints
-
-### Auth
-| Method | Path | Deskripsi |
-|---|---|---|
-| POST | /api/v1/auth/register | UC-01: Daftar akun |
-| POST | /api/v1/auth/verify-email | UC-18: Verifikasi email |
-| POST | /api/v1/auth/login | UC-02: Login |
-| POST | /api/v1/auth/logout | UC-03: Logout |
-| POST | /api/v1/auth/refresh | UC-22: Refresh token |
-| POST | /api/v1/auth/forgot-password | UC-19: Lupa password |
-| POST | /api/v1/auth/reset-password | UC-19: Reset password |
-
-### Documents & Extraction
-| Method | Path | Deskripsi |
-|---|---|---|
-| POST | /api/v1/documents | UC-04: Upload dokumen |
-| GET | /api/v1/documents | Daftar dokumen |
-| GET | /api/v1/documents/:id | Detail + hasil ekstraksi |
-| PUT | /api/v1/documents/:id/extraction | UC-20: Konfirmasi hasil |
-| POST | /api/v1/documents/:id/retry | Ulangi ekstraksi |
-
-### Dashboard
-| Method | Path | Deskripsi |
-|---|---|---|
-| GET | /api/v1/dashboard | UC-08: Dashboard |
-| GET | /api/v1/recommendations/latest | UC-09: Rekomendasi |
-| GET | /api/v1/alerts/active | UC-10: Alert aktif |
-| GET | /api/v1/history | UC-15: Riwayat |
-
----
-
-## Klasifikasi Fase (Rule-based)
-
-| Fase | Kriteria |
-|---|---|
-| Terkontrol Baik | HbA1c < 7,0% |
-| Perlu Perhatian | HbA1c 7,0 - 8,9% |
-| Berisiko Tinggi | HbA1c >= 9,0% atau gula darah ekstrem |
-| Belum Dapat Ditentukan | Data tidak lengkap |
-
----
-
-## Keamanan
-
-- Password: Argon2id
-- Access token: JWT 15 menit
-- Refresh token: 7 hari, rotasi + HttpOnly cookie
-- Rate limit login: 5 gagal / 15 menit
-- IDOR protection: semua query filter by user_id
-- File: validasi MIME + magic bytes, maks 10 MB
