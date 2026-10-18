@@ -1,0 +1,33 @@
+# ============================================================
+# Glukain — .gitignore root
+# ============================================================
+
+# ----- Dokumen internal (tidak untuk dipublikasikan) -----
+
+
+# ----- Rahasia & konfigurasi lokal -----
+.env
+.env.*
+!.env.example
+
+# ----- Dependensi & hasil build -----
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+.vite/
+
+# ----- Berkas unggahan pengguna (data lokal) -----
+uploads/
+
+# ----- Log & berkas sementara -----
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+.cache/
+
+# ----- Berkas sistem operasi / editor -----
+.DS_Store
+Thumbs.db
+desktop.ini
