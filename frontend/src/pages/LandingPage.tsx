@@ -1,65 +1,92 @@
 import { Link } from 'react-router-dom';
+import Logo from '../components/assets/Logo';
+import { HeartIcon, DocIcon, CalendarIcon, ShieldIcon } from '../components/assets/illustrations';
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-600 to-violet-600 flex flex-col">
-      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-        <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center mb-6">
-          <span className="text-white font-bold text-4xl">G</span>
-        </div>
-        <h1 className="text-3xl font-bold text-white mb-4">
-          Pantau diabetes lebih mudah, mandiri, dan aman
-        </h1>
-        <p className="text-white/80 mb-8 max-w-md">
-          Unggah foto hasil pemeriksaan dokter, AI membaca nilai medis Anda,
-          dan dapatkan rekomendasi yang sesuai kondisi.
-        </p>
+    <div className="min-h-screen flex">
+      {/* Left Panel - Hero Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-600 to-violet-600 p-12 flex-col justify-between relative overflow-hidden">
+        {/* Decorative circles */}
+        <div className="absolute top-20 right-20 w-64 h-64 rounded-full bg-white/5" />
+        <div className="absolute bottom-40 left-10 w-32 h-32 rounded-full bg-white/5" />
 
-        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
-          <Link to="/register" className="btn-primary flex-1">
-            Daftar
-          </Link>
-          <Link to="/login" className="btn-secondary bg-white/10 border-white text-white flex-1">
-            Masuk
-          </Link>
-        </div>
+        <Logo light />
 
-        <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-2xl">
-          <div className="text-center">
-            <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-3">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
+        <div className="relative z-10">
+          <h1 className="text-3xl xl:text-4xl font-bold text-white leading-tight mb-6 max-w-md">
+            Pantau diabetes lebih mudah, mandiri, dan aman
+          </h1>
+          <p className="text-white/70 text-lg mb-10 max-w-md">
+            Unggah foto hasil pemeriksaan dokter, AI membaca nilai medis Anda, dan dapatkan rekomendasi yang sesuai kondisi.
+          </p>
+
+          {/* Feature card */}
+          <div className="bg-white/10 backdrop-blur rounded-2xl p-6 max-w-sm">
+            <div className="space-y-4">
+              <FeatureItem icon={<HeartIcon />} text="Foto hasil lab, AI membaca" />
+              <FeatureItem icon={<DocIcon />} text="Rekomendasi sesuai kondisi" />
+              <FeatureItem icon={<CalendarIcon />} text="Pengingat obat" />
+              <FeatureItem icon={<ShieldIcon />} text="Data medis Anda tetap privat" />
             </div>
-            <h3 className="text-white font-semibold mb-1">Foto Hasil Lab</h3>
-            <p className="text-white/60 text-sm">AI membaca nilai medis otomatis</p>
-          </div>
-          <div className="text-center">
-            <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-3">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-            <h3 className="text-white font-semibold mb-1">Rekomendasi</h3>
-            <p className="text-white/60 text-sm">Sesuai kondisi Anda</p>
-          </div>
-          <div className="text-center">
-            <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-3">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-            </div>
-            <h3 className="text-white font-semibold mb-1">Pengingat Obat</h3>
-            <p className="text-white/60 text-sm">Tidak terlewat dosis</p>
           </div>
         </div>
-      </div>
 
-      <div className="py-4 text-center">
-        <p className="text-white/50 text-xs">
-          Glukain tidak menggantikan saran dokter
+        <p className="text-white/50 text-sm relative z-10">
+          Glukain tidak menggantikan saran dokter.
         </p>
       </div>
+
+      {/* Right Panel - CTA */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12 bg-white">
+        <div className="w-full max-w-md">
+          {/* Mobile logo */}
+          <div className="lg:hidden mb-8 flex justify-center">
+            <Logo />
+          </div>
+
+          <div className="mb-8">
+            <p className="text-sm font-semibold text-primary-600 mb-2">S-01 - GLUKAIN</p>
+            <h2 className="text-2xl xl:text-3xl font-bold text-neutral-900 mb-3">
+              Selamat datang di Glukain
+            </h2>
+            <p className="text-neutral-500">
+              Masuk ke akun Anda atau buat akun baru untuk memulai memantau kesehatan.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <Link to="/login" className="btn-primary w-full flex items-center justify-center gap-2">
+              Masuk
+            </Link>
+            <Link to="/register" className="btn-secondary w-full flex items-center justify-center gap-2">
+              Daftar
+            </Link>
+          </div>
+
+          {/* Mobile feature list */}
+          <div className="lg:hidden mt-8 space-y-3">
+            <FeatureItem icon={<HeartIcon />} text="Foto hasil lab, AI membaca" />
+            <FeatureItem icon={<DocIcon />} text="Rekomendasi sesuai kondisi" />
+            <FeatureItem icon={<CalendarIcon />} text="Pengingat obat" />
+          </div>
+
+          <p className="text-xs text-neutral-500 text-center mt-8">
+            Glukain tidak menggantikan saran dokter.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeatureItem({ icon, text }: { icon: React.ReactNode; text: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-xl bg-primary-600/10 flex items-center justify-center text-primary-600 shrink-0">
+        {icon}
+      </div>
+      <span className="text-neutral-900 font-medium">{text}</span>
     </div>
   );
 }
