@@ -12,6 +12,9 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "test": "vitest"
   },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "argon2": "^0.40.1",
