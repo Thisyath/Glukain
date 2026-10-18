@@ -47,10 +47,10 @@ export default function DashboardPage() {
 
   const phaseColor = (code: string) => {
     switch (code) {
-      case 'CONTROLLED': return 'badge-success';
-      case 'NEEDS_ATTENTION': return 'badge-warning';
-      case 'HIGH_RISK': return 'badge-danger';
-      default: return 'badge-neutral';
+      case 'CONTROLLED': return 'bg-success-100 text-success-600';
+      case 'NEEDS_ATTENTION': return 'bg-warning-100 text-neutral-900';
+      case 'HIGH_RISK': return 'bg-danger-100 text-danger-600';
+      default: return 'bg-neutral-500/10 text-neutral-500';
     }
   };
 
@@ -58,7 +58,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Alert Banner */}
       {data?.activeAlert && (
-        <div className="p-4 rounded-card bg-danger-100 border-l-4 border-danger-600">
+        <div className="p-4 rounded-2xl bg-danger-100 border-l-4 border-danger-600">
           <div className="flex items-start gap-3">
             <svg className="w-6 h-6 text-danger-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -73,9 +73,9 @@ export default function DashboardPage() {
 
       {/* Phase Card */}
       {data?.latest && (
-        <div className="card">
+        <div className="bg-white rounded-2xl shadow-card p-6">
           <div className="flex items-center justify-between mb-4">
-            <span className={phaseColor(data.latest.phase.code)}>
+            <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold ${phaseColor(data.latest.phase.code)}`}>
               {data.latest.phase.label}
             </span>
             <span className="text-sm text-neutral-500">
@@ -83,19 +83,18 @@ export default function DashboardPage() {
             </span>
           </div>
 
-          {/* Metrics */}
           {data.latest.values && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {data.latest.values.hba1c && (
+              {data.latest.values.hba1c !== undefined && data.latest.values.hba1c !== null && (
                 <MetricCard label="HbA1c" value={`${data.latest.values.hba1c}%`} />
               )}
-              {data.latest.values.fastingGlucose && (
+              {data.latest.values.fastingGlucose !== undefined && data.latest.values.fastingGlucose !== null && (
                 <MetricCard label="Gula Puasa" value={`${data.latest.values.fastingGlucose} mg/dL`} />
               )}
-              {data.latest.values.systolic && (
+              {data.latest.values.systolic !== undefined && data.latest.values.systolic !== null && (
                 <MetricCard label="Tensi" value={`${data.latest.values.systolic}/${data.latest.values.diastolic}`} />
               )}
-              {data.latest.values.weightKg && (
+              {data.latest.values.weightKg !== undefined && data.latest.values.weightKg !== null && (
                 <MetricCard label="Berat" value={`${data.latest.values.weightKg} kg`} />
               )}
             </div>
@@ -109,16 +108,20 @@ export default function DashboardPage() {
 
       {/* Today's Medications */}
       {data && data.todayMedications.length > 0 && (
-        <div className="card">
+        <div className="bg-white rounded-2xl shadow-card p-6">
           <h3 className="font-semibold text-neutral-900 mb-3">Obat Hari Ini</h3>
           <div className="space-y-2">
             {data.todayMedications.map((med) => (
-              <div key={med.logId} className="flex items-center justify-between p-3 bg-surface-50 rounded-input">
+              <div key={med.logId} className="flex items-center justify-between p-3 bg-surface-50 rounded-xl">
                 <div>
                   <p className="font-medium text-neutral-900">{med.medicationName}</p>
                   <p className="text-sm text-neutral-500">{med.dose}</p>
                 </div>
-                <span className={`badge ${med.status === 'CONFIRMED' ? 'badge-success' : med.status === 'MISSED' ? 'badge-warning' : 'badge-neutral'}`}>
+                <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold ${
+                  med.status === 'CONFIRMED' ? 'bg-success-100 text-success-600' :
+                  med.status === 'MISSED' ? 'bg-warning-100 text-neutral-900' :
+                  'bg-neutral-500/10 text-neutral-500'
+                }`}>
                   {med.status === 'CONFIRMED' ? 'Sudah Minum' : med.status === 'MISSED' ? 'Belum Dikonfirmasi' : 'Menunggu'}
                 </span>
               </div>
@@ -136,7 +139,7 @@ export default function DashboardPage() {
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="text-center p-3 bg-surface-50 rounded-input">
+    <div className="text-center p-3 bg-surface-50 rounded-xl">
       <p className="text-2xl font-bold text-neutral-900">{value}</p>
       <p className="text-xs text-neutral-500 mt-1">{label}</p>
     </div>

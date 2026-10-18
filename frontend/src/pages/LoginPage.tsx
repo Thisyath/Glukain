@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { authApi } from '../api/auth';
+import Logo from '../components/assets/Logo';
+import { EyeIcon } from '../components/assets/illustrations';
 
 const loginSchema = z.object({
   email: z.string().email('Format email tidak valid'),
@@ -16,6 +18,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [serverError, setServerError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -43,35 +46,52 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-50 flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-white flex items-center justify-center p-6">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-600 to-violet-600 flex items-center justify-center">
-              <span className="text-white font-bold text-lg">G</span>
-            </div>
-            <span className="font-bold text-xl text-neutral-900">Glukain</span>
-          </Link>
-          <h1 className="text-2xl font-bold text-neutral-900">Masuk</h1>
-          <p className="text-neutral-500 mt-2">Selamat datang kembali</p>
+        <div className="flex justify-center mb-8">
+          <Logo />
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="card space-y-4">
-          {serverError && (
-            <div className="p-3 rounded-input bg-danger-100 text-danger-600 text-sm">
-              {serverError}
-            </div>
-          )}
+        <div className="text-center mb-8">
+          <p className="text-primary-600 text-[13px] font-bold mb-2">S-04 - MASUK</p>
+          <h1 className="text-[28px] font-bold text-neutral-900 leading-9 mb-3">
+            Selamat datang kembali
+          </h1>
+          <p className="text-neutral-500 text-base leading-6">
+            Masuk ke akun Glukain Anda
+          </p>
+        </div>
 
+        {serverError && (
+          <div className="p-3 rounded-input bg-danger-100 text-danger-600 text-sm mb-4">
+            {serverError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-neutral-900 mb-1">Email</label>
+            <label className="block text-sm font-semibold text-neutral-900 mb-2">Email</label>
             <input {...register('email')} type="email" className="input-field" placeholder="email@contoh.com" />
             {errors.email && <p className="text-danger-600 text-sm mt-1">{errors.email.message}</p>}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-neutral-900 mb-1">Password</label>
-            <input {...register('password')} type="password" className="input-field" placeholder="Password" />
+            <label className="block text-sm font-semibold text-neutral-900 mb-2">Password</label>
+            <div className="relative">
+              <input
+                {...register('password')}
+                type={showPassword ? 'text' : 'password'}
+                className="input-field pr-12"
+                placeholder="Password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-900"
+              >
+                <EyeIcon visible={showPassword} />
+              </button>
+            </div>
             {errors.password && <p className="text-danger-600 text-sm mt-1">{errors.password.message}</p>}
           </div>
 
@@ -86,8 +106,13 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-neutral-500 mt-6">
-          Belum punya akun? <Link to="/register" className="text-primary-600 font-medium">Daftar</Link>
+        <p className="text-neutral-500 text-sm text-center mt-6">
+          Belum punya akun?{' '}
+          <Link to="/register" className="text-primary-600 font-medium">Daftar</Link>
+        </p>
+
+        <p className="text-neutral-500 text-[13px] text-center mt-4">
+          <Link to="/" className="text-primary-600">Kembali ke Beranda</Link>
         </p>
       </div>
     </div>

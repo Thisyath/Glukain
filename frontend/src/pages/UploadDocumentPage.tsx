@@ -23,7 +23,7 @@ export default function UploadDocumentPage() {
       return;
     }
 
-    setFile(null);
+    setFile(selectedFile);
     setError('');
 
     if (selectedFile.type.startsWith('image/')) {
@@ -33,8 +33,6 @@ export default function UploadDocumentPage() {
     } else {
       setPreview(null);
     }
-
-    setFile(selectedFile);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -61,25 +59,27 @@ export default function UploadDocumentPage() {
 
   return (
     <div className="max-w-lg mx-auto">
-      <h1 className="text-2xl font-bold text-neutral-900 mb-2">Unggah Dokumen</h1>
-      <p className="text-neutral-500 mb-6">Foto atau PDF hasil pemeriksaan dokter</p>
+      <div className="mb-6">
+        <p className="text-primary-600 text-[13px] font-bold mb-2">S-07 - UNGGAH DOKUMEN</p>
+        <h1 className="text-[28px] font-bold text-neutral-900 leading-9 mb-2">Unggah Dokumen</h1>
+        <p className="text-neutral-500 text-base leading-6">Foto atau PDF hasil pemeriksaan dokter</p>
+      </div>
 
       {error && (
         <div className="p-3 rounded-input bg-danger-100 text-danger-600 text-sm mb-4">{error}</div>
       )}
 
-      {/* Dropzone */}
       <div
         onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
         onDragLeave={() => setDragActive(false)}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-card p-8 text-center transition-colors ${
+        className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors ${
           dragActive ? 'border-primary-600 bg-primary-600/5' : 'border-neutral-500/30'
         }`}
       >
         {preview ? (
           <div className="space-y-4">
-            <img src={preview} alt="Preview" className="max-h-48 mx-auto rounded-input" />
+            <img src={preview} alt="Preview" className="max-h-48 mx-auto rounded-xl" />
             <p className="text-sm text-neutral-500">{file?.name}</p>
           </div>
         ) : file ? (
@@ -100,7 +100,7 @@ export default function UploadDocumentPage() {
             </div>
             <div>
               <p className="text-neutral-900 font-medium">Seret & letakkan file di sini</p>
-              <p className="text-sm text-neutral-500">JPG, PNG, PDF — maks 10 MB</p>
+              <p className="text-sm text-neutral-500">JPG, PNG, PDF - maks 10 MB</p>
             </div>
             <button type="button" onClick={() => fileInputRef.current?.click()} className="btn-secondary text-sm">
               Pilih File
@@ -117,8 +117,7 @@ export default function UploadDocumentPage() {
         />
       </div>
 
-      {/* Tips */}
-      <div className="mt-4 p-4 bg-surface-50 rounded-input">
+      <div className="mt-4 p-4 bg-surface-50 rounded-xl">
         <p className="text-sm font-medium text-neutral-900 mb-2">Tips foto yang baik:</p>
         <ul className="text-sm text-neutral-500 space-y-1">
           <li>Pencahayaan cukup, tidak buram</li>
@@ -127,9 +126,8 @@ export default function UploadDocumentPage() {
         </ul>
       </div>
 
-      {/* Checkup Date */}
       <div className="mt-4">
-        <label className="block text-sm font-medium text-neutral-900 mb-1">Tanggal Pemeriksaan (opsional)</label>
+        <label className="block text-sm font-semibold text-neutral-900 mb-2">Tanggal Pemeriksaan (opsional)</label>
         <input
           type="date"
           value={checkupDate}

@@ -84,10 +84,11 @@ export default function ConfirmExtractionPage() {
     );
   }
 
-  // Show result after confirmation
   if (result) {
     return (
       <div className="max-w-md mx-auto text-center py-8">
+        <p className="text-primary-600 text-[13px] font-bold mb-2">S-09 - HASIL ANALISIS</p>
+
         <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
           result.phase.code === 'HIGH_RISK' ? 'bg-danger-100' :
           result.phase.code === 'NEEDS_ATTENTION' ? 'bg-warning-100' :
@@ -104,15 +105,15 @@ export default function ConfirmExtractionPage() {
           )}
         </div>
 
-        <h2 className="text-2xl font-bold text-neutral-900 mb-2">{result.phase.label}</h2>
+        <h2 className="text-[28px] font-bold text-neutral-900 mb-2">{result.phase.label}</h2>
 
         {result.alert && (
-          <div className="p-4 rounded-card bg-danger-100 text-danger-600 mb-4">
+          <div className="p-4 rounded-2xl bg-danger-100 text-danger-600 mb-4">
             <p className="font-semibold">{result.alert.message}</p>
           </div>
         )}
 
-        <div className="card text-left mb-4">
+        <div className="bg-white rounded-2xl shadow-card p-6 text-left mb-4">
           <h3 className="font-semibold text-neutral-900 mb-2">Alasan:</h3>
           <ul className="text-sm text-neutral-500 space-y-1">
             {result.phase.reason.map((r: string, i: number) => (
@@ -122,7 +123,7 @@ export default function ConfirmExtractionPage() {
         </div>
 
         {result.recommendation && (
-          <div className="card text-left mb-4">
+          <div className="bg-white rounded-2xl shadow-card p-6 text-left mb-4">
             <h3 className="font-semibold text-neutral-900 mb-2">Rekomendasi:</h3>
             <div className="space-y-2 text-sm text-neutral-500">
               <p><span className="font-medium text-neutral-900">Diet:</span> {result.recommendation.diet}</p>
@@ -131,7 +132,7 @@ export default function ConfirmExtractionPage() {
           </div>
         )}
 
-        <p className="text-xs text-neutral-500 mb-4">{result.disclaimer}</p>
+        <p className="text-[13px] text-neutral-500 mb-6">{result.disclaimer}</p>
 
         <button onClick={() => navigate('/dashboard')} className="btn-primary">
           Lihat Dashboard
@@ -142,16 +143,18 @@ export default function ConfirmExtractionPage() {
 
   return (
     <div className="max-w-lg mx-auto">
-      <h1 className="text-2xl font-bold text-neutral-900 mb-2">Konfirmasi Hasil</h1>
-      <p className="text-neutral-500 mb-6">Periksa dan koreksi nilai bila diperlukan</p>
+      <div className="mb-6">
+        <p className="text-primary-600 text-[13px] font-bold mb-2">S-09 - KONFIRMASI HASIL</p>
+        <h1 className="text-[28px] font-bold text-neutral-900 leading-9 mb-2">Konfirmasi Hasil</h1>
+        <p className="text-neutral-500 text-base leading-6">Periksa dan koreksi nilai bila diperlukan</p>
+      </div>
 
       {error && (
-        <div className="p-3 rounded-input bg-danger-100 text-danger-600 text-sm mb-4">{error}</div>
+        <div className="p-3 rounded-xl bg-danger-100 text-danger-600 text-sm mb-4">{error}</div>
       )}
 
-      {/* Checkup Date */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-neutral-900 mb-1">Tanggal Pemeriksaan</label>
+        <label className="block text-sm font-semibold text-neutral-900 mb-2">Tanggal Pemeriksaan</label>
         <input
           type="date"
           value={checkupDate}
@@ -160,16 +163,15 @@ export default function ConfirmExtractionPage() {
         />
       </div>
 
-      {/* Values Form */}
-      <div className="card space-y-4">
-        <ValueField label="HbA1c (%)" value={values.hba1c} onChange={(v) => setValues({ ...values, hba1c: v })} confidence={doc.extractionResult?.confidence?.hba1c} />
-        <ValueField label="Gula Darah Puasa (mg/dL)" value={values.fastingGlucose} onChange={(v) => setValues({ ...values, fastingGlucose: v })} confidence={doc.extractionResult?.confidence?.fastingGlucose} />
+      <div className="bg-white rounded-2xl shadow-card p-6 space-y-4">
+        <ValueField label="HbA1c (%)" value={values.hba1c} onChange={(v) => setValues({ ...values, hba1c: v })} lowConfidence={doc.extractionResult?.confidence?.hba1c !== undefined && doc.extractionResult.confidence.hba1c < 0.7} />
+        <ValueField label="Gula Darah Puasa (mg/dL)" value={values.fastingGlucose} onChange={(v) => setValues({ ...values, fastingGlucose: v })} lowConfidence={doc.extractionResult?.confidence?.fastingGlucose !== undefined && doc.extractionResult.confidence.fastingGlucose < 0.7} />
         <ValueField label="Gula Darah Sewaktu (mg/dL)" value={values.randomGlucose} onChange={(v) => setValues({ ...values, randomGlucose: v })} />
         <ValueField label="Kolesterol Total (mg/dL)" value={values.totalCholesterol} onChange={(v) => setValues({ ...values, totalCholesterol: v })} />
         <ValueField label="LDL (mg/dL)" value={values.ldl} onChange={(v) => setValues({ ...values, ldl: v })} />
         <ValueField label="HDL (mg/dL)" value={values.hdl} onChange={(v) => setValues({ ...values, hdl: v })} />
         <ValueField label="Trigliserida (mg/dL)" value={values.triglyceride} onChange={(v) => setValues({ ...values, triglyceride: v })} />
-        <ValueField label="Sistolik (mmHg)" value={values.systolic} onChange={(v) => setValues({ ...values, systolic: v })} confidence={doc.extractionResult?.confidence?.systolic} />
+        <ValueField label="Sistolik (mmHg)" value={values.systolic} onChange={(v) => setValues({ ...values, systolic: v })} lowConfidence={doc.extractionResult?.confidence?.systolic !== undefined && doc.extractionResult.confidence.systolic < 0.7} />
         <ValueField label="Diastolik (mmHg)" value={values.diastolic} onChange={(v) => setValues({ ...values, diastolic: v })} />
         <ValueField label="Berat Badan (kg)" value={values.weightKg} onChange={(v) => setValues({ ...values, weightKg: v })} />
       </div>
@@ -185,28 +187,24 @@ export default function ConfirmExtractionPage() {
   );
 }
 
-function ValueField({ label, value, onChange, confidence }: {
+function ValueField({ label, value, onChange, lowConfidence }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  confidence?: number;
+  lowConfidence?: boolean;
 }) {
-  const isLowConfidence = confidence !== undefined && confidence < 0.7;
-
   return (
     <div>
-      <label className="block text-sm font-medium text-neutral-900 mb-1">
+      <label className="block text-sm font-semibold text-neutral-900 mb-1">
         {label}
-        {isLowConfidence && (
-          <span className="ml-2 text-warning-500 text-xs">Mohon periksa</span>
-        )}
+        {lowConfidence && <span className="ml-2 text-warning-500 text-xs">Mohon periksa</span>}
       </label>
       <input
         type="number"
         step="any"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`input-field ${isLowConfidence ? 'border-warning-500 bg-warning-100/30' : ''}`}
+        className={`input-field ${lowConfidence ? 'border-warning-500 bg-warning-100/30' : ''}`}
         placeholder="—"
       />
     </div>

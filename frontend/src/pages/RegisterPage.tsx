@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { authApi } from '../api/auth';
 import Logo from '../components/assets/Logo';
-import { HeartIcon, DocIcon, CalendarIcon, ShieldIcon, EyeIcon, ArrowRightIcon, CheckCircleIcon } from '../components/assets/illustrations';
+import { HeartIcon, DocIcon, CalendarIcon, ShieldIcon, EyeIcon, ArrowRightIcon } from '../components/assets/illustrations';
 
 const registerSchema = z.object({
   name: z.string().min(1, 'Nama wajib diisi').max(100),
