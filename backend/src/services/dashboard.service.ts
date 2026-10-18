@@ -1,10 +1,7 @@
-import { PrismaClient } from '@prisma/client';
 import { phases, PhaseCode } from '../config/thresholds';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 export class DashboardService {
-  // UC-08: Get dashboard data
   async getDashboard(userId: string): Promise<any> {
     const latestPhase = await prisma.phaseRecord.findFirst({
       where: { userId },
@@ -99,7 +96,6 @@ export class DashboardService {
     };
   }
 
-  // UC-09: Get latest recommendation
   async getLatestRecommendation(userId: string): Promise<any> {
     const rec = await prisma.recommendation.findFirst({
       where: { userId },
@@ -118,7 +114,6 @@ export class DashboardService {
     };
   }
 
-  // UC-15: Get history
   async getHistory(userId: string, range: string = '3m'): Promise<any> {
     const now = new Date();
     let startDate = new Date();

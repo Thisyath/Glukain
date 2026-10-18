@@ -1,7 +1,6 @@
-import { PrismaClient, Phase, PhaseRecord, ExtractionResult } from '@prisma/client';
+import { PhaseRecord } from '@prisma/client';
 import { phaseThresholds, phases, PhaseCode } from '../config/thresholds';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 export interface ClassificationResult {
   code: PhaseCode;
@@ -10,7 +9,6 @@ export interface ClassificationResult {
 }
 
 export class ClassificationService {
-  // UC-06: Classify condition phase
   async classifyPhase(extractionId: string, userId: string): Promise<ClassificationResult> {
     const extraction = await prisma.extractionResult.findFirst({
       where: { id: extractionId, userId },
@@ -21,15 +19,15 @@ export class ClassificationService {
       throw Object.assign(new Error('Data ekstraksi tidak ditemukan'), { code: 'NOT_FOUND', status: 404 });
     }
 
-    if (!extraction) {
-      throw Object.assign(new Error('Data ekstraksi tidak ditemukan'), { code: 'NOT_FOUND', status: 404 });
-    }
-
     const result = this.determinePhase(extraction);
 
-    // Save phase record
-    await prisma.phaseRecord.create({
-      data: {
+    // Save phase record.
+    // Satu ekstraksi hanya punya satu fase terakhir (extractionId unique),
+    // jadi pakai upsert agar konfirmasi ulang tidak crash dengan P2002.
+    const phaseRecord = await prisma.phaseRecord.upsert({
+      where: { extractionId },
+      update: { phase: result.code, reason: result.reason },
+      create: {
         userId,
         extractionId,
         phase: result.code,
@@ -37,31 +35,45 @@ export class ClassificationService {
       },
     });
 
-    // If HIGH_RISK, create alert (UC-10)
-    if (result.code === 'HIGH_RISK') {
-      await prisma.alert.create({
-        data: {
-          userId,
-          phaseRecordId: extractionId,
-          type: 'HIGH_RISK',
-          message: 'Segera hubungi tenaga medis.',
-        },
-      });
+    // Alert Berisiko Tinggi tetap tampil sampai ada pemeriksaan terbaru
+    // dengan fase bukan Berisiko Tinggi.
+    const activeAlert = await prisma.alert.findFirst({
+      where: { userId, phaseRecordId: phaseRecord.id, resolvedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
 
-      await prisma.notification.create({
-        data: {
-          userId,
-          type: 'HIGH_RISK_ALERT',
-          title: 'Kondisi Berisiko Tinggi',
-          body: 'Segera hubungi tenaga medis.',
-          refType: 'alert',
-          refId: extractionId,
-        },
+    if (result.code === 'HIGH_RISK') {
+      // Hindari alert & notifikasi ganda saat konfirmasi ulang.
+      if (!activeAlert) {
+        const alert = await prisma.alert.create({
+          data: {
+            userId,
+            phaseRecordId: phaseRecord.id,
+            type: 'HIGH_RISK',
+            message: 'Segera hubungi tenaga medis.',
+          },
+        });
+
+        await prisma.notification.create({
+          data: {
+            userId,
+            type: 'HIGH_RISK_ALERT',
+            title: 'Kondisi Berisiko Tinggi',
+            body: 'Segera hubungi tenaga medis.',
+            refType: 'alert',
+            refId: alert.id,
+          },
+        });
+      }
+    } else if (activeAlert) {
+      // Fase terbaru bukan HIGH_RISK -> tutup alert aktif.
+      await prisma.alert.update({
+        where: { id: activeAlert.id },
+        data: { resolvedAt: new Date() },
       });
     }
 
-    // Create recommendation (UC-07)
-    await this.createRecommendation(userId, extractionId, result.code);
+    await this.createRecommendation(userId, phaseRecord.id, result.code);
 
     return result;
   }
@@ -128,7 +140,8 @@ export class ClassificationService {
     };
   }
 
-  // UC-07: Create recommendation based on phase
+  // Satu phaseRecord punya satu rekomendasi; konfirmasi ulang memperbarui
+  // teksnya mengikuti rule fase terbaru, bukan menumpuk baris baru.
   private async createRecommendation(userId: string, phaseRecordId: string, phase: PhaseCode): Promise<void> {
     const rule = await prisma.recommendationRule.findUnique({
       where: { phase },
@@ -136,13 +149,30 @@ export class ClassificationService {
 
     if (!rule) return;
 
+    const data = {
+      dietText: rule.dietText,
+      activityText: rule.activityText,
+      medicationNote: rule.medicationNote,
+    };
+
+    const existing = await prisma.recommendation.findFirst({
+      where: { userId, phaseRecordId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existing) {
+      await prisma.recommendation.update({
+        where: { id: existing.id },
+        data,
+      });
+      return;
+    }
+
     await prisma.recommendation.create({
       data: {
         userId,
         phaseRecordId,
-        dietText: rule.dietText,
-        activityText: rule.activityText,
-        medicationNote: rule.medicationNote,
+        ...data,
       },
     });
   }

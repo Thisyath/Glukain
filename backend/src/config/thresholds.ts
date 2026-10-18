@@ -1,6 +1,6 @@
 /**
  * Ambang batas klasifikasi fase & aturan makanan.
- * NFR-15: semua ambang batas di file konfigurasi, bukan hardcode.
+ * Semua ambang batas di file konfigurasi, bukan hardcode.
  * Nilai bawah adalah usulan awal — wajib divalidasi dengan sumber medis/dosen.
  */
 

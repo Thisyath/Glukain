@@ -3,14 +3,13 @@ import multer from 'multer';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
 import { extractionService, extractionValuesSchema } from '../services/extraction.service';
 import { classificationService } from '../services/classification.service';
 import { authJwt } from '../middlewares/authJwt';
 import { validate } from '../middlewares/validate';
+import { prisma } from '../lib/prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Multer config
 const storage = multer.diskStorage({
@@ -23,6 +22,12 @@ const storage = multer.diskStorage({
   },
 });
 
+const uploadDir = './uploads';
+import fs from 'fs';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
@@ -31,12 +36,16 @@ const upload = multer({
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Format tidak didukung, gunakan JPG/PNG/PDF'));
+      cb(
+        Object.assign(new Error('Format tidak didukung, gunakan JPG/PNG/PDF'), {
+          status: 415,
+          code: 'UNSUPPORTED_MEDIA_TYPE',
+        })
+      );
     }
   },
 });
 
-// UC-04: Upload document
 router.post('/', authJwt, upload.single('file'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
@@ -81,7 +90,31 @@ router.get('/:id', authJwt, async (req: Request, res: Response) => {
   }
 });
 
-// UC-20: Confirm/correct extraction
+// Serve berkas dokumen (hanya pemilik) — dipakai pratinjau sumber di layar konfirmasi
+router.get('/:id/file', authJwt, async (req: Request, res: Response) => {
+  try {
+    const file = await extractionService.getDocumentFile(req.params.id, req.user!.id);
+    const absolutePath = path.resolve(file.filePath);
+
+    if (!fs.existsSync(absolutePath)) {
+      return res.status(404).json({
+        error: { code: 'FILE_MISSING', message: 'Berkas tidak ditemukan di server' },
+      });
+    }
+
+    res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(file.originalName)}"`
+    );
+    return res.sendFile(absolutePath);
+  } catch (error: any) {
+    res.status(error.status || 500).json({
+      error: { code: error.code || 'INTERNAL_ERROR', message: error.message },
+    });
+  }
+});
+
 router.put('/:id/extraction', authJwt, validate(z.object({
   checkupDate: z.string().optional(),
   values: extractionValuesSchema,
@@ -92,33 +125,36 @@ router.put('/:id/extraction', authJwt, validate(z.object({
 
     // Get extraction ID for classification
     const doc = await extractionService.getDocument(req.params.id, req.user!.id);
-    const extractionId = doc.extractionResult?.id;
+    const extractionId = doc.extraction?.id;
 
-    if (extractionId) {
-      // UC-06: Classify phase
-      const classification = await classificationService.classifyPhase(extractionId, req.user!.id);
-
-      // Get recommendation
-      const rec = await prisma.recommendation.findFirst({
-        where: { userId: req.user!.id },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      res.json({
-        data: {
-          phase: {
-            code: classification.code,
-            label: classification.label,
-            reason: classification.reason,
-          },
-          recommendation: rec
-            ? { diet: rec.dietText, activity: rec.activityText, medicationNote: rec.medicationNote }
-            : null,
-          alert: classification.code === 'HIGH_RISK' ? { message: 'Segera hubungi tenaga medis.' } : null,
-          disclaimer: 'Hasil ini bukan pengganti saran dokter.',
-        },
+    if (!extractionId) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Hasil ekstraksi tidak ditemukan' },
       });
     }
+
+    const classification = await classificationService.classifyPhase(extractionId, req.user!.id);
+
+    // Get recommendation
+    const rec = await prisma.recommendation.findFirst({
+      where: { userId: req.user!.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      data: {
+        phase: {
+          code: classification.code,
+          label: classification.label,
+          reason: classification.reason,
+        },
+        recommendation: rec
+          ? { diet: rec.dietText, activity: rec.activityText, medicationNote: rec.medicationNote }
+          : null,
+        alert: classification.code === 'HIGH_RISK' ? { message: 'Segera hubungi tenaga medis.' } : null,
+        disclaimer: 'Hasil ini bukan pengganti saran dokter.',
+      },
+    });
   } catch (error: any) {
     res.status(error.status || 500).json({
       error: { code: error.code || 'INTERNAL_ERROR', message: error.message },

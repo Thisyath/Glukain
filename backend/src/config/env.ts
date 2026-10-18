@@ -11,6 +11,8 @@ export const env = {
     refreshTTLDays: parseInt(process.env.REFRESH_TTL_DAYS || '7'),
   },
   frontendOrigin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
+  // OPSIONAL — belum dipakai. Selama kosong, ekstraksi dokumen memakai mode mock
+  // (lihat extraction.service.ts). Isi saat API AI sudah tersedia.
   ai: {
     apiKey: process.env.AI_API_KEY || '',
     model: process.env.AI_MODEL || 'gemini-1.5-flash',

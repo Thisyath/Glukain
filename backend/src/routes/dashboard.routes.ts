@@ -1,13 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { dashboardService } from '../services/dashboard.service';
 import { authJwt } from '../middlewares/authJwt';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 const router = Router();
 
-// UC-08: Dashboard
 router.get('/', authJwt, async (req: Request, res: Response) => {
   try {
     const data = await dashboardService.getDashboard(req.user!.id);
@@ -19,7 +16,6 @@ router.get('/', authJwt, async (req: Request, res: Response) => {
   }
 });
 
-// UC-09: Latest recommendation
 router.get('/recommendations/latest', authJwt, async (req: Request, res: Response) => {
   try {
     const data = await dashboardService.getLatestRecommendation(req.user!.id);
@@ -36,11 +32,8 @@ router.get('/recommendations/latest', authJwt, async (req: Request, res: Respons
   }
 });
 
-// UC-10: Active alert
 router.get('/alerts/active', authJwt, async (req: Request, res: Response) => {
   try {
-    const { PrismaClient } = await import('@prisma/client');
-    const prisma = new PrismaClient();
     const data = await prisma.alert.findFirst({
       where: { userId: req.user!.id, resolvedAt: null },
       orderBy: { createdAt: 'desc' },
@@ -53,7 +46,6 @@ router.get('/alerts/active', authJwt, async (req: Request, res: Response) => {
   }
 });
 
-// UC-15: History
 router.get('/history', authJwt, async (req: Request, res: Response) => {
   try {
     const range = (req.query.range as string) || '3m';

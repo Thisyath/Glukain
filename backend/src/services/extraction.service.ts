@@ -1,8 +1,15 @@
-import { PrismaClient, DocumentStatus } from '@prisma/client';
+import { DocumentStatus } from '@prisma/client';
 import { validationRanges } from '../config/thresholds';
 import { z } from 'zod';
+import { prisma } from '../lib/prisma';
+import { env } from '../config/env';
 
-const prisma = new PrismaClient();
+// Beri tahu sekali saat start bahwa ekstraksi berjalan tanpa API key AI.
+if (env.nodeEnv !== 'production' && !env.ai.apiKey) {
+  console.log(
+    '[DEV] Ekstraksi memakai MOCK (AI_API_KEY kosong). Hasil contoh untuk semua dokumen: HbA1c 8,2% / gula darah puasa 156 mg/dL.'
+  );
+}
 
 // Validation schema for extraction values
 export const extractionValuesSchema = z.object({
@@ -22,9 +29,8 @@ export const extractionValuesSchema = z.object({
 }, { message: 'Minimal satu nilai medis harus diisi' });
 
 export class ExtractionService {
-  // UC-04: Upload document
   async uploadDocument(userId: string, file: Express.Multer.File, checkupDate?: Date): Promise<{ id: string; status: DocumentStatus }> {
-    // Check daily quota (BR-09)
+    // Check daily quota
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const uploadCount = await prisma.medicalDocument.count({
@@ -52,11 +58,10 @@ export class ExtractionService {
     return { id: doc.id, status: 'PROCESSING' };
   }
 
-  // UC-05: Extract medical data from document
   async extractData(documentId: string, userId: string, filePath: string): Promise<void> {
     try {
-      // In production: call AI API (Gemini/OCR.space)
-      // For now, simulate extraction with mock data
+      // MODE MOCK: tidak memanggil API AI apa pun. Nilai contoh dari
+      // simulateExtraction() dipakai sampai AI_API_KEY tersedia.
       const mockExtraction = await this.simulateExtraction(filePath);
 
       if (!mockExtraction || Object.keys(mockExtraction.values).length === 0) {
@@ -89,7 +94,6 @@ export class ExtractionService {
     }
   }
 
-  // UC-20: Confirm/correct extraction results
   async confirmExtraction(documentId: string, userId: string, values: any, checkupDate?: Date): Promise<void> {
     const extraction = await prisma.extractionResult.findFirst({
       where: { documentId, userId },
@@ -128,10 +132,77 @@ export class ExtractionService {
       throw Object.assign(new Error('Dokumen tidak ditemukan'), { code: 'NOT_FOUND', status: 404 });
     }
 
-    return doc;
+    return this.toDocumentDto(doc);
   }
 
-  // List documents
+  // Get dokumen mentah untuk keperluan internal (mis. menyajikan berkas)
+  async getDocumentFile(
+    documentId: string,
+    userId: string
+  ): Promise<{ filePath: string; mimeType: string; originalName: string }> {
+    const doc = await prisma.medicalDocument.findFirst({
+      where: { id: documentId, userId },
+    });
+
+    if (!doc) {
+      throw Object.assign(new Error('Dokumen tidak ditemukan'), { code: 'NOT_FOUND', status: 404 });
+    }
+
+    return { filePath: doc.filePath, mimeType: doc.mimeType, originalName: doc.originalName };
+  }
+
+  /**
+   * Field-level dokumen yang dipakai bersama oleh endpoint daftar dan detail.
+   * Eksplisit agar bentuk respons API tidak ikut berubah saat kolom Prisma berubah.
+   */
+  private toDocumentBase(doc: any) {
+    return {
+      id: doc.id,
+      status: doc.status,
+      originalName: doc.originalName,
+      mimeType: doc.mimeType,
+      sizeBytes: doc.sizeBytes,
+      errorMessage: doc.errorMessage,
+      checkupDate: doc.checkupDate,
+      uploadedAt: doc.uploadedAt,
+    };
+  }
+
+  /**
+   * Bentuk respons dokumen + hasil ekstraksi agar konsisten dengan kontrak API
+   * (PRD §10.4): nilai medis dibungkus di `extraction.values`, bukan field datar
+   * hasil Prisma. Decimal dikonversi ke number agar tidak jadi string di JSON.
+   */
+  private toDocumentDto(doc: any) {
+    const ex = doc.extractionResult;
+
+    return {
+      ...this.toDocumentBase(doc),
+      extraction: ex
+        ? {
+            id: ex.id,
+            values: {
+              hba1c: ex.hba1c !== null && ex.hba1c !== undefined ? Number(ex.hba1c) : null,
+              fastingGlucose: ex.fastingGlucose,
+              randomGlucose: ex.randomGlucose,
+              totalCholesterol: ex.totalCholesterol,
+              ldl: ex.ldl,
+              hdl: ex.hdl,
+              triglyceride: ex.triglyceride,
+              systolic: ex.systolic,
+              diastolic: ex.diastolic,
+              weightKg: ex.weightKg !== null && ex.weightKg !== undefined ? Number(ex.weightKg) : null,
+            },
+            confidence: ex.confidence,
+            isConfirmed: ex.isConfirmed,
+            confirmedAt: ex.confirmedAt,
+            createdAt: ex.createdAt,
+          }
+        : null,
+    };
+  }
+
+  // List documents — bentuk konsisten dengan detail, tanpa nested extraction
   async listDocuments(userId: string, page: number = 1, limit: number = 10): Promise<any[]> {
     const docs = await prisma.medicalDocument.findMany({
       where: { userId },
@@ -139,7 +210,7 @@ export class ExtractionService {
       skip: (page - 1) * limit,
       take: limit,
     });
-    return docs;
+    return docs.map((doc) => this.toDocumentBase(doc));
   }
 
   // Retry extraction
@@ -160,11 +231,21 @@ export class ExtractionService {
     this.extractData(documentId, userId, doc.filePath).catch(console.error);
   }
 
-  // Simulate AI extraction (replace with real AI API call)
-  private async simulateExtraction(filePath: string): Promise<{ values: any, confidence: any } | null> {
-    // In production, this would call Gemini API or OCR.space
-    // For prototype, return mock data
-    await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate processing time
+  /**
+   * Simulasi ekstraksi (MODE MOCK).
+   *
+   * Aplikasi sengaja berjalan tanpa API key AI. Apa pun dokumen yang diunggah,
+   * hasilnya selalu sama: HbA1c 8,2% dan gula darah puasa 156 mg/dL, ditambah
+   * beberapa nilai lain agar layar konfirmasi dan klasifikasi fase tetap
+   * bisa diuji.
+   *
+   * Untuk memakai AI sungguhan di progress berikutnya: isi `AI_API_KEY`
+   * (lihat `config/env.ts`) lalu ganti isi method ini dengan panggilan API
+   * (Gemini free tier / OCR.space — PRD §7) yang mengembalikan bentuk
+   * `{ values, confidence }` yang sama.
+   */
+  private async simulateExtraction(filePath: string): Promise<{ values: any; confidence: any } | null> {
+    await new Promise((resolve) => setTimeout(resolve, 3000)); // tiru durasi proses
 
     return {
       values: {

@@ -1,14 +1,14 @@
-import { PrismaClient, User, EmailToken } from '@prisma/client';
+import { User, EmailToken } from '@prisma/client';
 import argon2 from 'argon2';
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes } from 'crypto';
 import { env } from '../config/env';
 import { generateAccessToken, generateRefreshToken, hashToken } from '../utils/jwt';
 import { addDays, addMinutes, isExpired } from '../utils/time';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 export interface AuthResponse {
   accessToken: string;
+  refreshToken: string;
   expiresIn: number;
   user: {
     id: string;
@@ -20,10 +20,10 @@ export interface AuthResponse {
 
 export interface TokenResponse {
   accessToken: string;
+  refreshToken: string;
 }
 
 export class AuthService {
-  // UC-01: Register
   async register(name: string, email: string, password: string, consent: boolean): Promise<{ userId: string; message: string }> {
     const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (existing) {
@@ -41,15 +41,14 @@ export class AuthService {
     });
 
     // Create verification token
-    await this.createEmailToken(user.id, 'VERIFY', 15);
+    const verificationToken = await this.createEmailToken(user.id, 'VERIFY', 15);
 
     // In production: send email. For dev: log to console
-    console.log(`[DEV] Verification link: ${env.frontendOrigin}/verify-email?token=${this.getLastToken(user.id)}`);
+    console.log(`[DEV] Verification link: ${env.frontendOrigin}/verify-email?token=${verificationToken}`);
 
     return { userId: user.id, message: 'Cek email Anda untuk verifikasi' };
   }
 
-  // UC-18: Verify Email
   async verifyEmail(token: string): Promise<void> {
     const tokenHash = hashToken(token);
     const emailToken = await prisma.emailToken.findUnique({
@@ -77,7 +76,6 @@ export class AuthService {
     ]);
   }
 
-  // UC-02: Login
   async login(email: string, password: string, ip?: string, userAgent?: string): Promise<AuthResponse> {
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
 
@@ -100,7 +98,7 @@ export class AuthService {
         where: { id: user.id },
         data: { failedLoginCount: failedCount, lockedUntil },
       });
-      throw Object.assign(new Error('Email atou password salah'), { code: 'INVALID_CREDENTIALS', status: 401 });
+      throw Object.assign(new Error('Email atau password salah'), { code: 'INVALID_CREDENTIALS', status: 401 });
     }
 
     // Check email verified
@@ -137,6 +135,7 @@ export class AuthService {
 
     return {
       accessToken,
+      refreshToken,
       expiresIn: env.jwt.accessTTL,
       user: {
         id: user.id,
@@ -147,7 +146,6 @@ export class AuthService {
     };
   }
 
-  // UC-22: Refresh Token
   async refreshToken(refreshToken: string, ip?: string, userAgent?: string): Promise<TokenResponse> {
     const tokenHash = hashToken(refreshToken);
     const stored = await prisma.refreshToken.findUnique({
@@ -183,10 +181,9 @@ export class AuthService {
     ]);
 
     const accessToken = generateAccessToken(stored.userId);
-    return { accessToken };
+    return { accessToken, refreshToken: newRefreshToken };
   }
 
-  // UC-03: Logout
   async logout(refreshToken: string): Promise<void> {
     const tokenHash = hashToken(refreshToken);
     await prisma.refreshToken.updateMany({
@@ -195,7 +192,6 @@ export class AuthService {
     });
   }
 
-  // UC-19: Forgot Password
   async forgotPassword(email: string): Promise<{ message: string }> {
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     // Always return neutral - anti user enumeration
@@ -203,11 +199,30 @@ export class AuthService {
       return { message: 'Jika email terdaftar, tautan dikirim' };
     }
 
-    await this.createEmailToken(user.id, 'RESET', 30);
+    const resetToken = await this.createEmailToken(user.id, 'RESET', 30);
+
+    // In production: send email via SMTP (nodemailer). For dev: log to console,
+    // karena SMTP_USER/SMTP_PASS masih kosong sehingga tautan tidak bisa dikirim.
+    console.log(`[DEV] Reset link: ${env.frontendOrigin}/reset-password?token=${resetToken}`);
+
     return { message: 'Jika email terdaftar, tautan dikirim' };
   }
 
-  // UC-19: Reset Password
+  // Respons selalu netral — anti user enumeration
+  async resendVerification(email: string): Promise<{ message: string }> {
+    const neutral = { message: 'Jika email terdaftar dan belum terverifikasi, tautan telah dikirim' };
+
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    if (!user || user.emailVerifiedAt) {
+      return neutral;
+    }
+
+    const verificationToken = await this.createEmailToken(user.id, 'VERIFY', 15);
+    console.log(`[DEV] Verification link: ${env.frontendOrigin}/verify-email?token=${verificationToken}`);
+
+    return neutral;
+  }
+
   async resetPassword(token: string, newPassword: string): Promise<void> {
     const tokenHash = hashToken(token);
     const emailToken = await prisma.emailToken.findUnique({
@@ -257,15 +272,7 @@ export class AuthService {
     return token;
   }
 
-  private async getLastToken(userId: string): Promise<string> {
-    // This is a simplified approach - in production, return the token directly
-    const tokens = await prisma.emailToken.findMany({
-      where: { userId, type: 'VERIFY' },
-      orderBy: { createdAt: 'desc' },
-      take: 1,
-    });
-    return tokens[0]?.id || '';
-  }
+  // getLastToken is no longer needed - createEmailToken returns the token directly
 }
 
 export const authService = new AuthService();

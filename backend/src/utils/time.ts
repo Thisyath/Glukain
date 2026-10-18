@@ -1,5 +1,5 @@
 /**
- * Waktu disimpan UTC, ditampilkan sesuai zona waktu pasien (BR-10).
+ * Waktu disimpan UTC, ditampilkan sesuai zona waktu pasien.
  */
 
 export function toUTC(date: Date | string): Date {

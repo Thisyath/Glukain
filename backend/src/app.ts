@@ -35,6 +35,20 @@ app.use('/api/v1', dashboardRoutes); // /recommendations, /alerts, /history
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Batas ukuran file dari multer -> 413 (bukan 500)
+  if (err?.name === 'MulterError') {
+    const maxSizeMb = Math.round(env.upload.maxSize / (1024 * 1024));
+    return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({
+      error: {
+        code: err.code,
+        message:
+          err.code === 'LIMIT_FILE_SIZE'
+            ? `Ukuran file melebihi batas maksimal ${maxSizeMb} MB`
+            : err.message,
+      },
+    });
+  }
+
   console.error(err);
   res.status(err.status || 500).json({
     error: {

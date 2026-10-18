@@ -37,7 +37,6 @@ const resetPasswordSchema = z.object({
   newPassword: z.string().min(8, 'Password minimal 8 karakter').regex(/[a-zA-Z]/).regex(/[0-9]/),
 });
 
-// UC-01: Register
 router.post('/register', authLimiter, validate(registerSchema), async (req: Request, res: Response) => {
   try {
     const { name, email, password, consent } = req.body;
@@ -50,7 +49,6 @@ router.post('/register', authLimiter, validate(registerSchema), async (req: Requ
   }
 });
 
-// UC-18: Verify Email
 router.post('/verify-email', validate(verifyEmailSchema), async (req: Request, res: Response) => {
   try {
     await authService.verifyEmail(req.body.token);
@@ -62,7 +60,17 @@ router.post('/verify-email', validate(verifyEmailSchema), async (req: Request, r
   }
 });
 
-// UC-02: Login
+router.post('/resend-verification', authLimiter, validate(forgotPasswordSchema), async (req: Request, res: Response) => {
+  try {
+    const result = await authService.resendVerification(req.body.email);
+    res.json({ data: result });
+  } catch (error: any) {
+    res.status(error.status || 500).json({
+      error: { code: error.code || 'INTERNAL_ERROR', message: error.message },
+    });
+  }
+});
+
 router.post('/login', authLimiter, validate(loginSchema), async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
@@ -74,7 +82,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req: Request, r
     );
 
     // Set refresh token cookie
-    res.cookie('refresh_token', result.accessToken, {
+    res.cookie('refresh_token', result.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
@@ -82,7 +90,13 @@ router.post('/login', authLimiter, validate(loginSchema), async (req: Request, r
       path: '/api/v1/auth',
     });
 
-    res.json({ data: result });
+    res.json({
+      data: {
+        accessToken: result.accessToken,
+        expiresIn: result.expiresIn,
+        user: result.user,
+      },
+    });
   } catch (error: any) {
     res.status(error.status || 500).json({
       error: { code: error.code || 'INTERNAL_ERROR', message: error.message },
@@ -90,7 +104,6 @@ router.post('/login', authLimiter, validate(loginSchema), async (req: Request, r
   }
 });
 
-// UC-22: Refresh Token
 router.post('/refresh', async (req: Request, res: Response) => {
   try {
     const refreshToken = req.cookies?.refresh_token;
@@ -101,7 +114,14 @@ router.post('/refresh', async (req: Request, res: Response) => {
     }
 
     const result = await authService.refreshToken(refreshToken, req.ip, req.headers['user-agent']);
-    res.json({ data: result });
+    res.cookie('refresh_token', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/api/v1/auth',
+    });
+    res.json({ data: { accessToken: result.accessToken } });
   } catch (error: any) {
     res.status(error.status || 500).json({
       error: { code: error.code || 'INTERNAL_ERROR', message: error.message },
@@ -109,7 +129,6 @@ router.post('/refresh', async (req: Request, res: Response) => {
   }
 });
 
-// UC-03: Logout
 router.post('/logout', async (req: Request, res: Response) => {
   try {
     const refreshToken = req.cookies?.refresh_token;
@@ -125,7 +144,6 @@ router.post('/logout', async (req: Request, res: Response) => {
   }
 });
 
-// UC-19: Forgot Password
 router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), async (req: Request, res: Response) => {
   try {
     const result = await authService.forgotPassword(req.body.email);
@@ -137,7 +155,6 @@ router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), asy
   }
 });
 
-// UC-19: Reset Password
 router.post('/reset-password', validate(resetPasswordSchema), async (req: Request, res: Response) => {
   try {
     await authService.resetPassword(req.body.token, req.body.newPassword);
