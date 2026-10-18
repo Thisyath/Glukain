@@ -1,0 +1,376 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ USER & AUTH ============
+
+model User {
+  id                String            @id @default(uuid())
+  name              String            @db.VarChar(100)
+  email             String            @unique @db.VarChar(190)
+  passwordHash      String            @db.VarChar(255)
+  timezone          String            @default("Asia/Jakarta") @db.VarChar(50)
+  consentAt         DateTime?
+  emailVerifiedAt   DateTime?
+  failedLoginCount  Int               @default(0)
+  lockedUntil       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  emailTokens        EmailToken[]
+  refreshTokens      RefreshToken[]
+  medicalDocuments   MedicalDocument[]
+  extractionResults  ExtractionResult[]
+  phaseRecords       PhaseRecord[]
+  recommendations    Recommendation[]
+  alerts             Alert[]
+  medications        Medication[]
+  medicationLogs     MedicationLog[]
+  notifications      Notification[]
+  subscriptions      Subscription[]
+  foodAnalyses       FoodAnalysis[]
+  chatMessages       ChatMessage[]
+  auditLogs          AuditLog[]
+
+  @@map("users")
+}
+
+model EmailToken {
+  id        String    @id @default(uuid())
+  userId    String
+  type      EmailType
+  tokenHash String    @unique @db.Char(64)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_tokens")
+}
+
+enum EmailType {
+  VERIFY
+  RESET
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  familyId  String    @db.Char(36)
+  tokenHash String    @unique @db.Char(64)
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?   @db.VarChar(255)
+  ip        String?   @db.VarChar(45)
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+// ============ DOCUMENTS & EXTRACTION ============
+
+model MedicalDocument {
+  id           String           @id @default(uuid())
+  userId       String
+  filePath     String           @db.VarChar(255)
+  originalName String           @db.VarChar(255)
+  mimeType     String           @db.VarChar(50)
+  sizeBytes    Int
+  status       DocumentStatus   @default(PROCESSING)
+  errorMessage String?          @db.VarChar(255)
+  checkupDate  DateTime?        @db.Date
+  uploadedAt   DateTime         @default(now())
+
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  extractionResult ExtractionResult?
+
+  @@index([userId, uploadedAt(sort: Desc)])
+  @@map("medical_documents")
+}
+
+enum DocumentStatus {
+  PROCESSING
+  EXTRACTED
+  CONFIRMED
+  FAILED
+  UNRECOGNIZED
+}
+
+model ExtractionResult {
+  id            String   @id @default(uuid())
+  documentId    String   @unique
+  userId        String
+  hba1c         Decimal? @db.Decimal(4, 1)
+  fastingGlucose Int?    @db.Int
+  randomGlucose  Int?    @db.Int
+  totalCholesterol Int? @db.Int
+  ldl           Int?    @db.Int
+  hdl           Int?    @db.Int
+  triglyceride   Int?    @db.Int
+  systolic      Int?    @db.Int
+  diastolic     Int?    @db.Int
+  weightKg      Decimal? @db.Decimal(5, 1)
+  confidence    Json?
+  isConfirmed   Boolean  @default(false)
+  confirmedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  document MedicalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phaseRecord PhaseRecord?
+
+  @@map("extraction_results")
+}
+
+// ============ CLASSIFICATION & RECOMMENDATIONS ============
+
+model PhaseRecord {
+  id           String      @id @default(uuid())
+  userId       String
+  extractionId String      @unique
+  phase        Phase
+  reason       Json
+  determinedAt DateTime    @default(now())
+
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  extraction ExtractionResult @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+  recommendations Recommendation[]
+  alerts       Alert[]
+
+  @@index([userId, determinedAt(sort: Desc)])
+  @@map("phase_records")
+}
+
+enum Phase {
+  CONTROLLED
+  NEEDS_ATTENTION
+  HIGH_RISK
+  UNDETERMINED
+}
+
+model RecommendationRule {
+  id             String   @id @default(uuid())
+  phase          Phase    @unique
+  dietText       String   @db.Text
+  activityText   String   @db.Text
+  medicationNote String   @db.Text
+  updatedAt      DateTime @updatedAt
+
+  @@map("recommendation_rules")
+}
+
+model Recommendation {
+  id             String   @id @default(uuid())
+  userId         String
+  phaseRecordId  String
+  dietText       String   @db.Text
+  activityText   String   @db.Text
+  medicationNote String   @db.Text
+  createdAt      DateTime @default(now())
+
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phaseRecord PhaseRecord     @relation(fields: [phaseRecordId], references: [id], onDelete: Cascade)
+
+  @@map("recommendations")
+}
+
+// ============ ALERTS ============
+
+model Alert {
+  id            String    @id @default(uuid())
+  userId        String
+  phaseRecordId String
+  type          AlertType
+  message       String    @db.VarChar(255)
+  createdAt     DateTime  @default(now())
+  acknowledgedAt DateTime?
+  resolvedAt    DateTime?
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phaseRecord PhaseRecord @relation(fields: [phaseRecordId], references: [id], onDelete: Cascade)
+
+  @@map("alerts")
+}
+
+enum AlertType {
+  HIGH_RISK
+}
+
+// ============ MEDICATIONS ============
+
+model Medication {
+  id        String          @id @default(uuid())
+  userId    String
+  name      String          @db.VarChar(100)
+  dose      String          @db.VarChar(50)
+  source    MedicationSource @default(MANUAL)
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schedules   MedicationSchedule[]
+
+  @@map("medications")
+}
+
+enum MedicationSource {
+  MANUAL
+  OCR
+}
+
+model MedicationSchedule {
+  id            String   @id @default(uuid())
+  medicationId  String
+  timeOfDay     DateTime @db.Time
+  daysOfWeek    Int      @default(127) @db.TinyInt
+  createdAt     DateTime @default(now())
+
+  medication Medication      @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  logs       MedicationLog[]
+
+  @@map("medication_schedules")
+}
+
+model MedicationLog {
+  id           String        @id @default(uuid())
+  userId       String
+  scheduleId   String
+  scheduledFor DateTime
+  reminderSentAt DateTime?
+  status       LogStatus     @default(PENDING)
+  confirmedAt  DateTime?
+  createdAt    DateTime      @default(now())
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schedule MedicationSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleId, scheduledFor])
+  @@map("medication_logs")
+}
+
+enum LogStatus {
+  PENDING
+  CONFIRMED
+  MISSED
+}
+
+// ============ NOTIFICATIONS ============
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String           @db.VarChar(255)
+  body      String           @db.Text
+  refType   String?          @db.VarChar(50)
+  refId     String?          @db.Char(36)
+  isRead   Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  HIGH_RISK_ALERT
+  MEDICATION_REMINDER
+  FOOD_RESULT
+  DOCUMENT_STATUS
+  SUBSCRIPTION
+}
+
+// ============ SUBSCRIPTIONS & PAYMENTS ============
+
+model Subscription {
+  id                   String            @id @default(uuid())
+  userId               String
+  orderId              String            @unique @db.VarChar(64)
+  amount               Int
+  status               SubscriptionStatus @default(PENDING)
+  midtransTransactionId String?          @db.VarChar(255)
+  paidAt               DateTime?
+  activeUntil          DateTime?
+  createdAt            DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  FAILED
+  EXPIRED
+}
+
+// ============ FOOD ANALYSES ============
+
+model FoodAnalysis {
+  id         String      @id @default(uuid())
+  userId     String
+  photoPath  String      @db.VarChar(255)
+  foodName   String?     @db.VarChar(255)
+  estSugarG  Decimal?    @db.Decimal(5, 1)
+  estCarbG   Decimal?    @db.Decimal(5, 1)
+  verdict    FoodVerdict
+  reason     String?     @db.VarChar(500)
+  createdAt  DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("food_analyses")
+}
+
+enum FoodVerdict {
+  SAFE
+  RISKY
+  UNRECOGNIZED
+}
+
+// ============ CHAT ============
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  userId    String
+  role      ChatRole
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("chat_messages")
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+// ============ AUDIT ============
+
+model AuditLog {
+  id        BigInt   @id @default(autoincrement())
+  userId    String?
+  action    String   @db.VarChar(50)
+  ip        String?  @db.VarChar(45)
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
