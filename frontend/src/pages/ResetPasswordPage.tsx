@@ -1,100 +1,135 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { authApi } from '../api/auth';
+import AuthLayout, { AuthFooter } from '../components/auth/AuthLayout';
+import FormHeading from '../components/auth/FormHeading';
+import Notice from '../components/auth/Notice';
+import TextField from '../components/auth/TextField';
+import Button from '../components/Button';
+import { Icon } from '../components/icons';
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token') || '';
+  const token = searchParams.get('token') ?? '';
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    setMessage('');
 
-    if (newPassword.length < 8) {
-      setError('Password minimal 8 karakter');
-      return;
-    }
+    const next: Record<string, string> = {};
+    if (newPassword.length < 8) next.newPassword = 'Password minimal 8 karakter';
+    else if (!/[a-zA-Z]/.test(newPassword)) next.newPassword = 'Password wajib mengandung huruf';
+    else if (!/[0-9]/.test(newPassword)) next.newPassword = 'Password wajib mengandung angka';
     if (newPassword !== confirmPassword) {
-      setError('Konfirmasi password tidak sama');
-      return;
+      next.confirmPassword = 'Konfirmasi password tidak sama';
     }
+
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
 
     setIsLoading(true);
-    setError('');
-
     try {
       await authApi.resetPassword(token, newPassword);
-      setMessage('Password berhasil diubah');
-      setTimeout(() => navigate('/login'), 2000);
+      // Backend mencabut semua refresh token → sesi lama diakhiri.
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user');
+      setMessage('Password berhasil diubah. Mengalihkan ke halaman masuk…');
+      setTimeout(() => navigate('/login', { replace: true }), 1500);
     } catch (err: any) {
-      setError(err.response?.data?.error?.message || 'Reset gagal, token tidak valid');
+      setError(
+        err.response?.data?.error?.message || 'Gagal mengubah password. Tautan mungkin kedaluwarsa.'
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (!token) {
+    return (
+      <AuthLayout>
+        <FormHeading
+          title="Buat password baru"
+          subtitle="Gunakan password yang berbeda dari sebelumnya."
+        />
+
+        <Notice tone="danger">
+          Tautan reset tidak ditemukan. Minta tautan baru dari halaman lupa password.
+        </Notice>
+
+        <Link
+          to="/forgot-password"
+          className="flex min-h-[48px] items-center justify-center rounded-control bg-primary-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-primary-600/90"
+        >
+          Minta tautan reset
+        </Link>
+
+        <AuthFooter />
+      </AuthLayout>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-surface-50 flex flex-col items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-neutral-900">Reset Password</h1>
-          <p className="text-neutral-500 mt-2">Masukkan password baru Anda</p>
+    <AuthLayout>
+      <FormHeading
+        title="Buat password baru"
+        subtitle="Gunakan password yang berbeda dari sebelumnya."
+      />
+
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+        {message && <Notice tone="success">{message}</Notice>}
+        {error && <Notice tone="danger">{error}</Notice>}
+
+        <TextField
+          label="Password baru"
+          toggleable
+          value={newPassword}
+          onChange={(event) => setNewPassword(event.target.value)}
+          error={errors.newPassword}
+          hint="Kuat • Minimal 8 karakter, huruf dan angka; disarankan 12+"
+          autoComplete="new-password"
+        />
+
+        <TextField
+          label="Konfirmasi password baru"
+          toggleable
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
+          error={errors.confirmPassword}
+          autoComplete="new-password"
+        />
+
+        <div className="rounded-control bg-surface-50 p-4">
+          <div className="flex items-center gap-2">
+            <Icon name="info" size={20} className="shrink-0 text-neutral-500" />
+            <p className="text-base font-semibold text-neutral-900">Sesi lama akan diakhiri</p>
+          </div>
+          <p className="mt-2 text-base leading-6 text-neutral-900/80">
+            Setelah password diubah, Anda perlu masuk kembali di semua perangkat.
+          </p>
         </div>
 
-        {message ? (
-          <div className="card text-center">
-            <div className="w-12 h-12 rounded-full bg-success-100 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <p className="text-neutral-900 font-medium">{message}</p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="card space-y-4">
-            {error && (
-              <div className="p-3 rounded-input bg-danger-100 text-danger-600 text-sm">{error}</div>
-            )}
-            <input type="hidden" value={token} />
+        <Button type="submit" loading={isLoading}>
+          Simpan password baru
+        </Button>
 
-            <div>
-              <label className="block text-sm font-medium text-neutral-900 mb-1">Password Baru</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="input-field"
-                placeholder="Minimal 8 karakter"
-              />
-            </div>
+        <Link
+          to="/login"
+          className="flex min-h-[48px] items-center justify-center rounded-control text-base font-semibold text-primary-600 transition-colors hover:bg-primary-600/5"
+        >
+          Kembali ke masuk
+        </Link>
+      </form>
 
-            <div>
-              <label className="block text-sm font-medium text-neutral-900 mb-1">Konfirmasi Password</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="input-field"
-                placeholder="Ulangi password baru"
-              />
-            </div>
-
-            <button type="submit" disabled={isLoading || !token} className="btn-primary w-full">
-              {isLoading ? 'Memproses...' : 'Ubah Password'}
-            </button>
-          </form>
-        )}
-
-        <p className="text-center text-neutral-500 mt-6">
-          <Link to="/login" className="text-primary-600 font-medium">Kembali ke Masuk</Link>
-        </p>
-      </div>
-    </div>
+      <AuthFooter />
+    </AuthLayout>
   );
 }

@@ -10,6 +10,7 @@ import DashboardPage from './pages/DashboardPage';
 import UploadDocumentPage from './pages/UploadDocumentPage';
 import ProcessingPage from './pages/ProcessingPage';
 import ConfirmExtractionPage from './pages/ConfirmExtractionPage';
+import ComingSoonPage from './pages/ComingSoonPage';
 import Layout from './components/Layout';
 
 function App() {
@@ -31,6 +32,12 @@ function App() {
         <Route path="/upload" element={<UploadDocumentPage />} />
         <Route path="/processing/:documentId" element={<ProcessingPage />} />
         <Route path="/confirm/:documentId" element={<ConfirmExtractionPage />} />
+        <Route path="/recommendations" element={<ComingSoonPage />} />
+        <Route path="/history" element={<ComingSoonPage />} />
+        <Route path="/medications" element={<ComingSoonPage />} />
+        <Route path="/food" element={<ComingSoonPage />} />
+        <Route path="/chat" element={<ComingSoonPage />} />
+        <Route path="/profile" element={<ComingSoonPage />} />
       </Route>
 
       {/* Fallback */}

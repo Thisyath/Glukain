@@ -35,26 +35,30 @@ export interface DashboardData {
   }>;
 }
 
+export interface LatestRecommendation {
+  phase?: string;
+  diet: string;
+  activity: string;
+  medicationNote?: string | null;
+  createdAt: string;
+}
+
 export const dashboardApi = {
-  // UC-08: Get dashboard
   get: async (): Promise<DashboardData> => {
     const { data: response } = await api.get('/dashboard');
     return response.data;
   },
 
-  // UC-09: Latest recommendation
-  getLatestRecommendation: async () => {
+  getLatestRecommendation: async (): Promise<LatestRecommendation | null> => {
     const { data: response } = await api.get('/recommendations/latest');
     return response.data;
   },
 
-  // UC-10: Active alert
   getActiveAlert: async () => {
     const { data: response } = await api.get('/alerts/active');
     return response.data;
   },
 
-  // UC-15: History
   getHistory: async (range: string = '3m') => {
     const { data: response } = await api.get('/history', { params: { range } });
     return response.data;

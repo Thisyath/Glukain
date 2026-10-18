@@ -44,8 +44,12 @@ export default {
       },
       borderRadius: {
         card: '16px',
+        control: '12px',
         button: '12px',
         input: '12px',
+        pill: '9999px',
+        md: '8px',
+        '32': '32px',
       },
       boxShadow: {
         card: '0 2px 8px rgba(67, 56, 202, 0.08)',

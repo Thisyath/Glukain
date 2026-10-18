@@ -1,44 +1,42 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authApi } from '../api/auth';
-import Logo from '../components/assets/Logo';
-import { EyeIcon } from '../components/assets/illustrations';
-
-const loginSchema = z.object({
-  email: z.string().email('Format email tidak valid'),
-  password: z.string().min(1, 'Password wajib diisi'),
-});
-
-type LoginFormData = z.infer<typeof loginSchema>;
+import AuthLayout, { AuthFooter } from '../components/auth/AuthLayout';
+import FormHeading from '../components/auth/FormHeading';
+import Notice from '../components/auth/Notice';
+import TextField from '../components/auth/TextField';
+import Button from '../components/Button';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [serverError, setServerError] = useState('');
+  const location = useLocation();
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [needsVerification, setNeedsVerification] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  });
-
-  const onSubmit = async (data: LoginFormData) => {
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setIsLoading(true);
-    setServerError('');
+    setError('');
+    setNeedsVerification(false);
 
     try {
-      await authApi.login(data);
-      navigate('/dashboard');
-    } catch (error: any) {
-      const code = error.response?.data?.error?.code;
+      await authApi.login({ email: email.trim(), password });
+      navigate(from ?? '/dashboard', { replace: true });
+    } catch (err: any) {
+      const code = err.response?.data?.error?.code;
       if (code === 'EMAIL_NOT_VERIFIED') {
-        navigate('/verify-email');
-      } else if (code === 'ACCOUNT_LOCKED') {
-        setServerError('Terlalu banyak percobaan, coba lagi dalam 15 menit');
+        setNeedsVerification(true);
+        setError('Akun Anda belum terverifikasi. Buka tautan/kode verifikasi yang dikirim ke email.');
       } else {
-        setServerError('Email atau password salah');
+        setError(
+          err.response?.data?.error?.message ||
+            'Email atau password salah. Periksa kembali lalu coba lagi.'
+        );
       }
     } finally {
       setIsLoading(false);
@@ -46,75 +44,73 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        <div className="flex justify-center mb-8">
-          <Logo />
-        </div>
+    <AuthLayout>
+      <FormHeading
+        title="Selamat datang kembali"
+        subtitle="Masuk untuk melanjutkan rutinitas sehat Anda."
+      />
 
-        <div className="text-center mb-8">
-          <p className="text-primary-600 text-[13px] font-bold mb-2">S-04 - MASUK</p>
-          <h1 className="text-[28px] font-bold text-neutral-900 leading-9 mb-3">
-            Selamat datang kembali
-          </h1>
-          <p className="text-neutral-500 text-base leading-6">
-            Masuk ke akun Glukain Anda
-          </p>
-        </div>
-
-        {serverError && (
-          <div className="p-3 rounded-input bg-danger-100 text-danger-600 text-sm mb-4">
-            {serverError}
-          </div>
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+        {error && (
+          <Notice tone="danger">
+            {error}
+            {needsVerification && (
+              <>
+                {' '}
+                <Link
+                  to={`/verify-email?email=${encodeURIComponent(email.trim())}`}
+                  className="font-semibold underline"
+                >
+                  Verifikasi sekarang
+                </Link>
+              </>
+            )}
+          </Notice>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          <div>
-            <label className="block text-sm font-semibold text-neutral-900 mb-2">Email</label>
-            <input {...register('email')} type="email" className="input-field" placeholder="email@contoh.com" />
-            {errors.email && <p className="text-danger-600 text-sm mt-1">{errors.email.message}</p>}
-          </div>
+        <TextField
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          autoComplete="email"
+          placeholder="siti.rahmawati@email.com"
+          required
+        />
 
-          <div>
-            <label className="block text-sm font-semibold text-neutral-900 mb-2">Password</label>
-            <div className="relative">
-              <input
-                {...register('password')}
-                type={showPassword ? 'text' : 'password'}
-                className="input-field pr-12"
-                placeholder="Password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-900"
-              >
-                <EyeIcon visible={showPassword} />
-              </button>
-            </div>
-            {errors.password && <p className="text-danger-600 text-sm mt-1">{errors.password.message}</p>}
-          </div>
+        <TextField
+          label="Password"
+          toggleable
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          autoComplete="current-password"
+          required
+        />
 
-          <div className="text-right">
-            <Link to="/forgot-password" className="text-sm text-primary-600 font-medium">
-              Lupa password?
-            </Link>
-          </div>
+        <Link
+          to="/forgot-password"
+          className="inline-block text-base font-semibold text-primary-600 hover:underline"
+        >
+          Lupa password?
+        </Link>
 
-          <button type="submit" disabled={isLoading} className="btn-primary w-full">
-            {isLoading ? 'Memproses...' : 'Masuk'}
-          </button>
-        </form>
+        <Button type="submit" icon="arrow-right" loading={isLoading}>
+          Masuk
+        </Button>
 
-        <p className="text-neutral-500 text-sm text-center mt-6">
+        <p className="text-center text-base text-neutral-900">
           Belum punya akun?{' '}
-          <Link to="/register" className="text-primary-600 font-medium">Daftar</Link>
+          <Link to="/register" className="font-semibold text-primary-600 hover:underline">
+            Daftar
+          </Link>
         </p>
 
-        <p className="text-neutral-500 text-[13px] text-center mt-4">
-          <Link to="/" className="text-primary-600">Kembali ke Beranda</Link>
+        <p className="text-[13px] leading-5 text-neutral-500">
+          Untuk keamanan, akun harus sudah terverifikasi. Jangan bagikan password kepada siapa pun.
         </p>
-      </div>
-    </div>
+      </form>
+
+      <AuthFooter />
+    </AuthLayout>
   );
 }

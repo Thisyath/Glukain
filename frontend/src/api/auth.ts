@@ -27,19 +27,16 @@ export interface AuthResponse {
 }
 
 export const authApi = {
-  // UC-01: Register
   register: async (data: RegisterData) => {
     const { data: response } = await api.post('/auth/register', data);
     return response.data;
   },
 
-  // UC-18: Verify Email
   verifyEmail: async (token: string) => {
     const { data: response } = await api.post('/auth/verify-email', { token });
     return response.data;
   },
 
-  // UC-02: Login
   login: async (data: LoginData): Promise<AuthResponse> => {
     const { data: response } = await api.post('/auth/login', data);
     const authData = response.data;
@@ -50,20 +47,23 @@ export const authApi = {
     return authData;
   },
 
-  // UC-03: Logout
   logout: async () => {
     await api.post('/auth/logout');
     localStorage.removeItem('access_token');
     localStorage.removeItem('user');
   },
 
-  // UC-19: Forgot Password
+  // Respons netral — anti user enumeration
+  resendVerification: async (email: string) => {
+    const { data: response } = await api.post('/auth/resend-verification', { email });
+    return response.data;
+  },
+
   forgotPassword: async (email: string) => {
     const { data: response } = await api.post('/auth/forgot-password', { email });
     return response.data;
   },
 
-  // UC-19: Reset Password
   resetPassword: async (token: string, newPassword: string) => {
     const { data: response } = await api.post('/auth/reset-password', { token, newPassword });
     return response.data;

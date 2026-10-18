@@ -1,15 +1,32 @@
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { documentsApi, Document } from '../api/documents';
+import InfoAlert from '../components/InfoAlert';
+import PageHeading from '../components/PageHeading';
+import Button from '../components/Button';
+import { Icon } from '../components/icons';
+import { fileTypeLabel, formatBytes, formatDateTime } from '../lib/format';
+
+const STEPS = [
+  { title: 'Mengunggah', description: 'Selesai' },
+  { title: 'Membaca dokumen', description: 'Sedang berlangsung…' },
+  { title: 'Menyiapkan analisis', description: 'Setelah nilai Anda dikonfirmasi' },
+  { title: 'Menyusun rekomendasi', description: 'Setelah nilai Anda dikonfirmasi' },
+];
 
 export default function ProcessingPage() {
   const { documentId } = useParams();
   const navigate = useNavigate();
   const [doc, setDoc] = useState<Document | null>(null);
-  const [step, setStep] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const steps = ['Mengunggah', 'Membaca dokumen', 'Menganalisis kondisi', 'Menyusun rekomendasi'];
+  const stopPolling = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (!documentId) return;
@@ -19,100 +36,200 @@ export default function ProcessingPage() {
         const data = await documentsApi.get(documentId);
         setDoc(data);
 
+        // Ekstraksi selesai → lanjut ke layar konfirmasi.
         if (data.status === 'EXTRACTED' || data.status === 'CONFIRMED') {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          setTimeout(() => navigate(`/confirm/${documentId}`), 500);
+          stopPolling();
+          setTimeout(() => navigate(`/confirm/${documentId}`), 400);
         } else if (data.status === 'FAILED' || data.status === 'UNRECOGNIZED') {
-          if (intervalRef.current) clearInterval(intervalRef.current);
+          stopPolling();
         }
       } catch (err) {
         console.error(err);
       }
     };
 
-    poll();
+    void poll();
     intervalRef.current = setInterval(poll, 2000);
 
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [documentId, navigate]);
+    return stopPolling;
+  }, [documentId, navigate, stopPolling]);
 
-  useEffect(() => {
-    if (!doc) return;
-    if (doc.status === 'PROCESSING') {
-      setStep((s) => Math.min(s + 1, steps.length - 1));
+  const handleRetry = async () => {
+    if (!documentId) return;
+    setIsRetrying(true);
+    try {
+      await documentsApi.retry(documentId);
+      setDoc((current) => (current ? { ...current, status: 'PROCESSING' } : current));
+      // Pastikan tidak ada interval ganda, lalu jalankan polling lagi.
+      stopPolling();
+      intervalRef.current = setInterval(async () => {
+        const data = await documentsApi.get(documentId);
+        setDoc(data);
+        if (data.status === 'EXTRACTED' || data.status === 'CONFIRMED') {
+          stopPolling();
+          setTimeout(() => navigate(`/confirm/${documentId}`), 400);
+        } else if (data.status === 'FAILED' || data.status === 'UNRECOGNIZED') {
+          stopPolling();
+        }
+      }, 2000);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setIsRetrying(false);
     }
-  }, [doc?.status]);
+  };
 
   if (!doc) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
-  if (doc.status === 'FAILED') {
-    return (
-      <div className="text-center py-12 max-w-md mx-auto">
-        <p className="text-primary-600 text-[13px] font-bold mb-2">S-08 - STATUS PROSES</p>
-        <h2 className="text-[28px] font-bold text-neutral-900 mb-2">Gagal Diproses</h2>
-        <p className="text-neutral-500 mb-4">Dokumen tidak dapat dibaca. Coba unggah ulang dengan foto yang lebih jelas.</p>
-        <div className="flex gap-3 justify-center">
-          <button onClick={() => navigate('/upload')} className="btn-primary">Unggah Ulang</button>
-          <button onClick={() => navigate('/dashboard')} className="btn-ghost">Kembali</button>
+      <>
+        <PageHeading
+          title="Dokumen sedang dibaca"
+          subtitle="Kami sedang mengekstrak angka, belum menentukan fase kondisi Anda."
+        />
+        <div className="grid place-items-center py-20">
+          <Icon name="loader-circle" size={32} className="animate-spin text-primary-600" />
         </div>
-      </div>
+      </>
     );
   }
 
-  if (doc.status === 'UNRECOGNIZED') {
+  const isFailed = doc.status === 'FAILED';
+  const isUnrecognized = doc.status === 'UNRECOGNIZED';
+
+  if (isFailed || isUnrecognized) {
     return (
-      <div className="text-center py-12 max-w-md mx-auto">
-        <p className="text-primary-600 text-[13px] font-bold mb-2">S-08 - STATUS PROSES</p>
-        <h2 className="text-[28px] font-bold text-neutral-900 mb-2">Dokumen Tidak Dikenali</h2>
-        <p className="text-neutral-500 mb-4">Tidak ada nilai medis yang terbaca. Pastikan foto hasil pemeriksaan yang jelas.</p>
-        <button onClick={() => navigate('/upload')} className="btn-primary">Unggah Ulang</button>
-      </div>
+      <>
+        <PageHeading
+          title={isFailed ? 'Dokumen gagal dibaca' : 'Dokumen tidak dikenali'}
+          subtitle={
+            isFailed
+              ? 'Terjadi kendala saat membaca dokumen. Anda dapat mencoba lagi atau mengunggah ulang.'
+              : 'Tidak ada nilai medis yang terbaca dari dokumen ini. Coba foto yang lebih jelas.'
+          }
+        />
+
+        <section className="card space-y-4">
+          <div className="flex items-center gap-4 border-b border-neutral-500/10 pb-4">
+            <span
+              className={`grid h-12 w-12 shrink-0 place-items-center rounded-control ${
+                isFailed ? 'bg-danger-100 text-danger-600' : 'bg-warning-100 text-neutral-900'
+              }`}
+            >
+              <Icon name={isFailed ? 'triangle-alert' : 'focus'} size={24} />
+            </span>
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <p className="truncate text-base font-semibold text-neutral-900">
+                {doc.originalName}
+              </p>
+              <p className="text-[13px] text-neutral-500">
+                {fileTypeLabel(doc.mimeType)} • {formatBytes(doc.sizeBytes)} •{' '}
+                {formatDateTime(doc.uploadedAt)}
+              </p>
+            </div>
+          </div>
+
+          <p className="text-base text-neutral-900">
+            {isFailed
+              ? doc.errorMessage || 'Ekstraksi gagal. Pastikan berkas tidak rusak lalu coba lagi.'
+              : 'Pastikan seluruh halaman terlihat, tidak buram, dan nama pemeriksaan beserta satuannya tidak terpotong.'}
+          </p>
+
+          <Button icon="refresh-cw" onClick={handleRetry} loading={isRetrying}>
+            Coba lagi
+          </Button>
+          <Button variant="ghost" onClick={() => navigate('/upload')}>
+            Unggah ulang
+          </Button>
+        </section>
+
+        <InfoAlert title="Konfirmasi Anda selalu lebih dahulu">
+          Kami tidak pernah menganalisis fase kondisi Anda tanpa persetujuan Anda di layar
+          Konfirmasi Hasil Ekstraksi.
+        </InfoAlert>
+      </>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto text-center py-8">
-      <p className="text-primary-600 text-[13px] font-bold mb-2">S-08 - STATUS PROSES</p>
-      <h2 className="text-[28px] font-bold text-neutral-900 mb-6">Memproses Dokumen</h2>
+    <>
+      <PageHeading
+        title="Dokumen sedang dibaca"
+        subtitle="Kami sedang mengekstrak angka, belum menentukan fase kondisi Anda."
+      />
 
-      <div className="w-20 h-20 rounded-full bg-primary-600/10 flex items-center justify-center mx-auto mb-6">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
+      <section className="card space-y-4">
+        <h2 className="text-lg font-semibold text-neutral-900">Menyiapkan hasil untuk Anda</h2>
 
-      <div className="space-y-3">
-        {steps.map((label, i) => (
-          <div key={i} className="flex items-center gap-3 p-3 rounded-xl">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-              i < step ? 'bg-success-100' : i === step ? 'bg-primary-600/10' : 'bg-surface-50'
-            }`}>
-              {i < step ? (
-                <svg className="w-4 h-4 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : i === step ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
-              ) : (
-                <div className="w-2 h-2 rounded-full bg-neutral-500/30"></div>
-              )}
-            </div>
-            <span className={`text-sm font-medium ${i <= step ? 'text-neutral-900' : 'text-neutral-500'}`}>
-              {label}
-            </span>
+        <div className="flex items-center gap-4 border-y border-neutral-500/10 py-2">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-control bg-surface-50 text-neutral-500">
+            <Icon name="file-text" size={24} />
+          </span>
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <p className="truncate text-base font-semibold text-neutral-900">{doc.originalName}</p>
+            <p className="text-[13px] text-neutral-500">
+              {formatBytes(doc.sizeBytes)} • Diunggah {formatDateTime(doc.uploadedAt)}
+            </p>
           </div>
-        ))}
-      </div>
+          <Icon name="chevron-right" size={20} className="shrink-0 text-neutral-500" />
+        </div>
 
-      <p className="text-xs text-neutral-500 mt-6">
-        Biasanya selesai dalam 10 detik. Anda bisa tutup halaman ini.
+        <div className="flex items-center gap-4 rounded-control bg-surface-50 p-4">
+          <Icon name="loader-circle" size={32} className="shrink-0 animate-spin text-primary-600" />
+          <div className="space-y-0.5">
+            <p className="text-base font-semibold text-neutral-900">Membaca angka pada dokumen…</p>
+            <p className="text-[13px] text-neutral-500">
+              Target proses kurang dari 10 detik; waktu dapat bervariasi.
+            </p>
+          </div>
+        </div>
+
+        <ol className="space-y-6 pt-2">
+          {STEPS.map((step, index) => {
+            const isDone = index === 0;
+            const isActive = index === 1;
+
+            return (
+              <li key={step.title} className="flex items-center gap-4">
+                <span
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-pill text-base font-bold ${
+                    isDone || isActive
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-surface-50 text-neutral-500'
+                  }`}
+                >
+                  {isDone ? (
+                    <Icon name="check" size={20} />
+                  ) : isActive ? (
+                    <Icon name="loader-circle" size={20} className="animate-spin" />
+                  ) : (
+                    index + 1
+                  )}
+                </span>
+                <span className="space-y-0.5">
+                  <span className="block text-base font-semibold text-neutral-900">
+                    {step.title}
+                  </span>
+                  <span className="block text-[13px] text-neutral-500">{step.description}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+
+      <InfoAlert title="Konfirmasi Anda selalu lebih dahulu">
+        Setelah pembacaan selesai, Anda akan memeriksa angka di layar Konfirmasi Hasil Ekstraksi.
+        Menganalisis kondisi dan menyusun rekomendasi final dilakukan hanya setelah Simpan &amp;
+        Analisis.
+      </InfoAlert>
+
+      <Button variant="secondary" onClick={() => navigate('/dashboard')}>
+        Kembali ke beranda
+      </Button>
+
+      <p className="text-[13px] text-neutral-500">
+        Ini visualisasi proses statis. Status siap tinjau akan muncul di Pusat Notifikasi.
       </p>
-    </div>
+    </>
   );
 }
