@@ -76,6 +76,8 @@ Glukain/
 │   │   └── server.ts
 │   ├── uploads/
 │   ├── .env.example
+│   ├── .dockerignore
+│   ├── Dockerfile
 │   └── package.json
 ├── frontend/
 │   ├── src/
@@ -125,7 +127,11 @@ Glukain/
 │   ├── index.html
 │   ├── tailwind.config.js
 │   ├── vite.config.ts
+│   ├── .dockerignore
+│   ├── Dockerfile
+│   ├── nginx.conf
 │   └── package.json
+├── docker-compose.yml
 ├── .gitignore
 └── README.md
 ```
@@ -214,9 +220,16 @@ Pengguna hanya bisa mengakses datanya sendiri. Percobaan membuka data milik akun
 
 Ada dua cara menjalankan Glukain: **tanpa Docker** (Node.js + MySQL lokal) atau **dengan Docker** (cukup Docker Desktop). Pilih salah satu — hasil akhirnya sama.
 
+| Yang perlu disiapkan | Opsi 1 — Tanpa Docker | Opsi 2 — Dengan Docker |
+|---|---|---|
+| Node.js | ✅ perlu | ❌ tidak perlu (dipakai di dalam container) |
+| MySQL | ✅ perlu (lokal) | ❌ tidak perlu (container `db` menyediakannya) |
+| Docker Desktop | ❌ tidak perlu | ✅ perlu |
+| Git | ✅ | ✅ |
+
 Karena proyek masih dalam pengembangan, dua hal sengaja berperilaku "sementara":
 
-- **Email belum dikirim.** Tautan verifikasi dan reset password dicetak di **terminal tempat backend dijalankan**, bukan dikirim lewat email.
+- **Email belum dikirim.** Tautan verifikasi dan reset password dicetak di **terminal backend** (tanpa Docker) atau **log container** (Docker), bukan dikirim lewat email.
 - **Pembacaan dokumen (OCR) masih mock.** Apa pun berkas yang diunggah, hasilnya selalu nilai contoh yang sama. Ini disengaja agar proyek bisa dijalankan **tanpa API key dan tanpa biaya**.
 
 Keduanya dijelaskan lebih lanjut di [Catatan mode pengembangan](#catatan-mode-pengembangan).
@@ -228,7 +241,7 @@ Keduanya dijelaskan lebih lanjut di [Catatan mode pengembangan](#catatan-mode-pe
 | Kebutuhan | Versi |
 |---|---|
 | Node.js | ≥ 20 |
-| MySQL | 8 (berjalan di `localhost:3306`) |
+| MySQL | 8 (berjalan di `localhost:3306`) — hanya untuk opsi ini |
 | npm | ikut Node.js |
 | Git | untuk mengunduh repositori |
 
@@ -309,7 +322,13 @@ Frontend otomatis meneruskan permintaan `/api` ke `http://localhost:3001` (lihat
 
 ## Opsi 2 — Dengan Docker
 
-Cara ini paling mudah untuk teman yang ingin mencoba tanpa memasang Node.js atau MySQL.
+Cara ini paling mudah untuk teman yang ingin mencoba **tanpa memasang Node.js atau MySQL**. Keduanya sudah disediakan oleh Docker:
+
+- **MySQL** berjalan di dalam container dari image `mysql:8` (service `db`).
+- **Node.js** dipakai di dalam container backend, bukan di laptop.
+- **Nginx** menyajikan frontend.
+
+Saat pertama kali dijalankan, Docker akan **mengunduh image** secara otomatis. Itu bukan instalasi manual — teman Anda cukup memasang **Docker Desktop**.
 
 ### Prasyarat
 
@@ -327,7 +346,12 @@ git clone https://github.com/Thisyath/Glukain.git
 cd Glukain
 ```
 
-### 2. Buat `.env` di root
+### 2. (Disarankan) Buat `.env` di root
+
+Langkah ini **bukan syarat agar MySQL bisa jalan** — MySQL sudah disediakan container `db`. `.env` hanya berisi nilai konfigurasi:
+
+- `MYSQL_ROOT_PASSWORD` — password untuk MySQL **di dalam container**.
+- `JWT_ACCESS_SECRET` — kunci penandatangan token login.
 
 Buat file `.env` di folder root (sejajar dengan `docker-compose.yml`):
 
@@ -336,7 +360,7 @@ MYSQL_ROOT_PASSWORD=ganti-dengan-password-kuat
 JWT_ACCESS_SECRET=ganti-dengan-string-acak-minimal-32-karakter
 ```
 
-> File ini sudah di-gitignore, jadi tidak ikut ter-commit. Kalau dilewati, Compose memakai nilai default yang lemah.
+> Kalau langkah ini dilewati, Compose tetap berjalan memakai nilai default (`password` dan secret bawaan). Itu cukup untuk demo lokal, tetapi sebaiknya diganti.
 
 ### 3. Jalankan
 
